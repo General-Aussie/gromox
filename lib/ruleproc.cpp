@@ -817,7 +817,6 @@ static int get_policy_from_message_content(rxparam par)
 
 	mlog(LV_ERR, "W-PREC: check class %s", par.cur.dir.c_str());
 	auto classs = par.ctnt->proplist.get<char>(PR_POLICY_TAG);
-	mlog(LV_ERR, "W-PREC: check policy 3 %c", classs);
 
     for (size_t i = 0; i < par.ctnt->proplist.count; ++i)
     {
