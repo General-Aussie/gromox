@@ -953,6 +953,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		
 		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
 		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
+		mlog(LV_ERR, "Start date: %llu", start);
+		mlog(LV_ERR, "End date: %llu", end);
 		auto start_whole = rop_util_nttime_to_unix(*start);
 		auto end_whole = rop_util_nttime_to_unix(*end);
         auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
@@ -975,15 +977,16 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		bool isEquipmentMailbox = true;
 
         if (isRoomMailbox || isEquipmentMailbox) {
+			mlog(LV_ERR, "W-PREC: entering if statement %s", par.cur.dir.c_str());
             // Room mailbox specific processing
             if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
                 strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
+					mlog(LV_ERR, "W-PREC: message is a meeting request %s", par.cur.dir.c_str());
                     if (flags != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
 						if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 							return ecError;
 						snprintf(buffer, sizeof(buffer), "Meeting Declined");
                         mlog(LV_INFO, "Declined due to recurrence against non-recurring policy.\n");
-                        return ecSuccess;
                     }
                 
 					if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
@@ -1001,7 +1004,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 									return ecError;
 								snprintf(buffer, sizeof(buffer), "Meeting Declined");
 								mlog(LV_INFO, "Declined due to conflict.\n");
-								return ecSuccess;
 							}   
 						}       
 						// recurring appointments
@@ -1017,7 +1019,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 								return ecError;
 							snprintf(buffer, sizeof(buffer), "Meeting Declined");
 							mlog(LV_INFO, "Declined due to conflict.\n");
-							return ecSuccess;
 						}   
 					}
 					// itemProps.set(ResponseStatus.lid, &responseAccepted);
@@ -1025,8 +1026,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 						return ecError;
 					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 						return ecError;
+					mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted %s", par.cur.dir.c_str());
 					if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
 						return ecError;
+					mlog(LV_ERR, "W-PREC: busy status set %s", par.cur.dir.c_str());
 					// itemProps.set(ResponseStatus, &olResponseDeclined);
 					// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 						// return ecError;
@@ -1036,7 +1039,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			if (pmsg->proplist.set(PR_RESPONSE_REQUESTED, &tmp_byte) != 0 ||
 				pmsg->proplist.set(PR_REPLY_REQUESTED, &tmp_byte) != 0)
 					return ecError;
-			return ecSuccess;
 
 			tmp_bin = 1;
 			// Set PR_RECIPIENT_TRACKSTATUS
@@ -1062,7 +1064,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 				nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
 				return ecRpcFailed;
-			return ecSuccess;
 	    }
     }
     return ecSuccess;
@@ -1100,7 +1101,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	err = process_meeting_requests(par, dir, policy);
 	if (err != ecSuccess){
 		return err;
-		mlog(LV_WARN, "W-1554: Meeting Processed Done %s", strerror(ecSuccess));
+		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
 	}
 	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());	
 
