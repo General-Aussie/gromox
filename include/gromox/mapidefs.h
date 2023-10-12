@@ -1404,6 +1404,15 @@ enum { /* for PidLidAppointmentStateFlags */
 	asfCanceled = 0x4U,
 };
 
+enum { /* for PidTagRecipientTrackStatus */
+	respNone		 = 0x0U,
+	respOrganized	 = 0x1U,
+	respTentative	 = 0x2U,
+	respAccepted	 = 0x3U,
+	respDeclined	 = 0x4U,
+	respNotResponded = 0x5U,
+};
+
 enum { /* for PidLidResponseStatus */
 	olResponseNone = 0,
 	olResponseOrganized,

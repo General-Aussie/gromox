@@ -1012,14 +1012,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 				snprintf(buffer, sizeof(buffer), "Meeting Accepted");
 				mlog(LV_ERR, "Accepted\n");
 			}
-		bool meeting_processed = true;
+		BOOL meeting_processed = TRUE;
 		mlog(LV_ERR, "W-PREC: setting meeting processed to true %s", par.cur.dir.c_str());
 		if (!pmsg->proplist.set(PR_PROCESSED, &meeting_processed)){
 			mlog(LV_ERR, "W-PREC: cannot set PR_PROCESSED to true %s", par.cur.dir.c_str());
 			return ecError;
 		}
 		mlog(LV_ERR, "W-PREC: successfully set PR_PROCESSED to true %s", par.cur.dir.c_str());
-		tmp_bin = 1;
+		tmp_bin = respAccepted;
 		// Set PR_RECIPIENT_TRACKSTATUS
 		if (!pmsg->proplist.set(PR_RECIPIENT_TRACKSTATUS, &tmp_bin))
 			return ecError;
