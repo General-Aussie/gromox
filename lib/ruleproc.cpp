@@ -884,7 +884,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	prcpts = tarray_set_init();
 	if (prcpts == nullptr)
 		return ecError;
-	tmp_byte = 0;
 	pmsg->set_rcpts_internal(prcpts);
 
 	auto pdisplay_name = par.ctnt->proplist.get<char>(PR_DISPLAY_NAME);
