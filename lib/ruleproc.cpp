@@ -975,7 +975,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 						// At least one conflict
 						if (out_status == 1) {
 							// itemProps.set(ResponseStatus.lid, &responseDeclined);
-							itemProps.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined);
+							props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined);
 							// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 							// 	return ecError;
 							if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
