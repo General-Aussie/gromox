@@ -897,17 +897,20 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
         return ecError;
     }
 
+	mlog(LV_ERR, "W-PREC: setting tags %s", par.cur.dir.c_str());
 	static constexpr uint32_t tags[] = {
 		PR_ENTRYID, PR_MESSAGE_CLASS, PR_START_DATE, PR_END_DATE, PR_RESPONSE_REQUESTED,
 		PR_REPLY_REQUESTED, PR_RECIPIENT_TRACKSTATUS, PidLidRecurring, PidLidResponseStatus,
 		PidLidBusyStatus, PR_PROCESSED,
 	};
 	static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
+	mlog(LV_ERR, "W-PREC: setting props %s", par.cur.dir.c_str());
 	TPROPVAL_ARRAY props{};
-	if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &props))
+	if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &props))
 		return ecError;
+	mlog(LV_ERR, "W-PREC: store properties gotten successfully %s", par.cur.dir.c_str());
 
-    auto entry_id = rows.pparray[i]->get<const uint32_t>(PR_ENTRYID);
+    auto entry_id = par.ctnt->proplist.get<const uint32_t>(PR_ENTRYID);
 	mlog(LV_ERR, "PR_ENTRYID: %u", *entry_id);
 	mlog(LV_ERR, "W-PREC: entryid gotten %s", par.cur.dir.c_str());
     // static PROPTAG_ARRAY pt = {sizeof(entry_id) / sizeof(entry_id[0]), deconst(entry_id)};
