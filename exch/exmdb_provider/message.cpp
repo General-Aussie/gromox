@@ -3972,16 +3972,16 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
 
     // Retrieve free/busy events within the specified time range
     std::vector<freebusy_event> freebusyData;
-	mlog(LV_ERR, "W-PREC: create frreebusy struct %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: create frreebusy struct %s", dir);
     if (!get_freebusy(username, dir, start_time, end_time, freebusyData)){
-        mlog(LV_ERR, "W-PREC: cannot get freebusy %s", par.cur.dir.c_str());
+        mlog(LV_ERR, "W-PREC: cannot get freebusy %s", dir);
 		return FALSE;
 	}
-	mlog(LV_ERR, "W-PREC: gotten freebusy done %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: gotten freebusy done %s", dir);
     // Iterate through free/busy events and check for conflicts
     for (const freebusy_event &event : freebusyData)
     {
-		mlog(LV_ERR, "W-PREC: check conflict %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: check conflict %s", dir);
         uint64_t event_start_time = rop_util_unix_to_nttime(event.start_time);
         uint64_t event_end_time = rop_util_unix_to_nttime(event.end_time);
 
@@ -3999,7 +3999,7 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
             return TRUE;
         }
     }
-	mlog(LV_ERR, "W-PREC: no conflict found %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: no conflict found %s", dir);
     // No conflicts found
     return TRUE;
 }
