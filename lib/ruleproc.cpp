@@ -899,7 +899,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	static constexpr uint32_t tags[] = {
 		PR_ENTRYID, PR_MESSAGE_CLASS, PR_START_DATE, PR_END_DATE, PR_RESPONSE_REQUESTED,
 		PR_REPLY_REQUESTED, PR_RECIPIENT_TRACKSTATUS, PidLidRecurring, PidLidResponseStatus,
-		PidLidBusyStatus, PR_PROCESSED,
+		PidLidBusyStatus, PR_PROCESSED, PR_DISPLAY_NAME,
 	};
 	static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
 	mlog(LV_ERR, "W-PREC: setting props %s", par.cur.dir.c_str());
@@ -932,6 +932,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto start_whole = rop_util_nttime_to_unix(*start);
 	auto end_whole = rop_util_nttime_to_unix(*end);
     auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+
+	auto use_name = props.get<char>(PR_DISPLAY_NAME);
+	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME using props: %s", use_name);
+	auto propmessage_class = props.get<const char>(PR_MESSAGE_CLASS);
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS with prop: %s", propmessage_class);
 
 	// TPROPVAL_ARRAY itemProps{};
     // if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &itemProps))
@@ -970,9 +975,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 						// At least one conflict
 						if (out_status == 1) {
 							// itemProps.set(ResponseStatus.lid, &responseDeclined);
-							// itemProps.set(ResponseStatus, &olResponseDeclined);
+							itemProps.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined);
 							// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-								// return ecError;
+							// 	return ecError;
 							if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 								return ecError;
 							if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
@@ -1005,9 +1010,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 				if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
 					return ecError;
 				mlog(LV_ERR, "W-PREC: busy status set %s", par.cur.dir.c_str());
-				// itemProps.set(ResponseStatus, &olResponseDeclined);
-				// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
-					// return ecError;
+				props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted);
+				if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+					return ecError;
+				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted using props %s", par.cur.dir.c_str());
 				snprintf(buffer, sizeof(buffer), "Meeting Accepted");
 				mlog(LV_ERR, "Accepted\n");
 			}
@@ -1071,7 +1077,9 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 		return err;
 		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
 	}
-	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());	
+	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
+	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
 
 	for (auto &&rule : rule_list) {
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
