@@ -1013,12 +1013,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 				mlog(LV_ERR, "Accepted\n");
 			}
 		mlog(LV_ERR, "W-PREC: create a response for the tracking status %s", par.cur.dir.c_str());
-		tmp_bin = respAccepted;
-		// Set PR_RECIPIENT_TRACKSTATUS
-		mlog(LV_ERR, "W-PREC: try to set response for the tracking status %s", par.cur.dir.c_str());
-		if (!pmsg->proplist.set(PR_RECIPIENT_TRACKSTATUS, &tmp_bin))
-			return ecError;
-		mlog(LV_ERR, "W-PREC: successfully set PR_RECIPIENT_TRACKSTATUS to 1 %s", par.cur.dir.c_str());
 			
 		uint64_t change_num = 0, modtime = 0;
 		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
