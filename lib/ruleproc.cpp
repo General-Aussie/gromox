@@ -913,9 +913,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	// Load the complex restriction to the table
 	uint32_t table_id = 0, row_count = 0;
 	if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, par.cur.fid, nullptr,
-	    TABLE_FLAG_ASSOCIATED, &rst_10, nullptr, &table_id, &row_count))
+	    TABLE_FLAG_ASSOCIATED, &rst_10, nullptr, &table_id, &row_count)){
 		mlog(LV_ERR, "W-PREC: Cannot load content table %s", par.cur.dir.c_str());
 		return ecError;
+		}
 	mlog(LV_ERR, "W-PREC: Loaded table successfully %s", par.cur.dir.c_str());
 
 	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
@@ -953,9 +954,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecError;
 		
 		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
-		mlog(LV_ERR, "W-PREC: PR_START_DATE %s", start);
 		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
-		mlog(LV_ERR, "W-PREC: PR_START_DATE %s", end);
 		auto start_whole = rop_util_nttime_to_unix(*start);
 		auto end_whole = rop_util_nttime_to_unix(*end);
         auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
@@ -1095,7 +1094,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
 
-	int policy = get_policy_from_message_content(par)
+	int policy = get_policy_from_message_content(par);
 	mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
 
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
