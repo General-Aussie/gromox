@@ -910,14 +910,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 	// Load the complex restriction to the table
 	uint32_t table_id = 0, row_count = 0;
-	if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, par.cur.fid, nullptr,
+	if (!exmdb_client::load_content_table(dir, CP_ACP, par.cur.fid, nullptr,
 	    TABLE_FLAG_ASSOCIATED, &rst_10, nullptr, &table_id, &row_count)){
 		mlog(LV_ERR, "W-PREC: Cannot load content table %s", par.cur.dir.c_str());
 		return ecError;
 		}
 	mlog(LV_ERR, "W-PREC: Loaded table successfully %s", par.cur.dir.c_str());
 
-	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
+	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id); });
 	mlog(LV_ERR, "W-PREC: unoaded table successfully %s", par.cur.dir.c_str());
 
 	// Define the property tags to retrieve
@@ -935,7 +935,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
     	return ecError;
 	}
 	mlog(LV_ERR, "W-PREC: querired table successfully %s", par.cur.dir.c_str());
-
+	mlog(LV_ERR, "W-PREC: about to enter for loop %s", par.cur.dir.c_str());
     for (size_t i = 0; i < rows.count; ++i) {
 		mlog(LV_ERR, "W-PREC: entering for loop %s", par.cur.dir.c_str());
         auto entry_id = rows.pparray[i]->get<const uint32_t>(PR_ENTRYID);
@@ -1073,7 +1073,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 				nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
 				return ecRpcFailed;
 	    }
+		mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
     }
+	mlog(LV_ERR, "W-PREC: left for loop %s", par.cur.dir.c_str());
     return ecSuccess;
 }
 
