@@ -953,8 +953,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		
 		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
 		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
-		mlog(LV_ERR, "Start date: %llu", start);
-		mlog(LV_ERR, "End date: %llu", end);
+		mlog(LV_ERR, "Start date: %llu", *start);
+		mlog(LV_ERR, "End date: %llu", *end);
 		auto start_whole = rop_util_nttime_to_unix(*start);
 		auto end_whole = rop_util_nttime_to_unix(*end);
         auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
