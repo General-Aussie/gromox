@@ -161,7 +161,8 @@ enum class exmdb_callid : uint8_t {
 	autoreply_tsquery = 0x87,
 	autoreply_tsupdate = 0x88,
 	get_mapping_replid = 0x89,
-	recalc_store_size = 0x8a,
+	appt_meetreq_overlap = 0x8a,
+	recalc_store_size = 0x8b,
 	/* update exch/exmdb_provider/names.cpp:exmdb_rpc_idtoname! */
 };
 
@@ -852,6 +853,12 @@ struct exreq_autoreply_tsupdate : public exreq {
 	char *peer = nullptr;
 };
 
+struct exreq_appt_meetreq_overlap : public exreq {
+	char *username;
+	uint64_t start_time = 0; 
+	uint64_t end_time = 0;
+}
+
 struct exreq_recalc_store_size : public exreq {
 	uint32_t flags = 0;
 };
@@ -1294,6 +1301,10 @@ struct exresp_store_eid_to_user : public exresp {
 
 struct exresp_autoreply_tsquery : public exresp {
 	uint64_t tdiff = 0;
+};
+
+struct exresp_appt_meetreq_overlap : public exresp {
+	uint32_t out_status;
 };
 
 using exreq_ping_store = exreq;

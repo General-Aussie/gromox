@@ -2242,6 +2242,31 @@ static pack_result exmdb_push(EXT_PUSH &x, const exreq_recalc_store_size &d)
 	return x.p_uint32(d.flags);
 }
 
+static pack_result exmdb_pull(EXT_PULL &x, exreq_appt_meetreq_overlap &d)
+{
+	uint8_t tmp_byte;
+	
+	TRY(x.g_uint8(&tmp_byte));
+	if (tmp_byte == 0)
+		d.username = nullptr;
+	else
+		TRY(x.g_str(&d.username));
+	TRY(x.g_uint64(&d.start_time));
+	return x.g_uint64(&d.end_time);
+}
+
+static pack_result exmdb_push(EXT_PUSH &x, const exreq_appt_meetreq_overlap &d)
+{
+	if (d.username == nullptr) {
+		TRY(x.p_uint8(0));
+	} else {
+		TRY(x.p_uint8(1));
+		TRY(x.p_str(d.username));
+	}
+	TRY(x.p_uint64(d.start_time));
+	return x.p_uint64(d.end_time);
+}
+
 #define RQ_WITH_ARGS \
 	E(get_named_propids) \
 	E(get_named_propnames) \
@@ -2363,6 +2388,7 @@ static pack_result exmdb_push(EXT_PUSH &x, const exreq_recalc_store_size &d)
 	E(purge_softdelete) \
 	E(autoreply_tsquery) \
 	E(autoreply_tsupdate) \
+	E(appt_meetreq_overlap) \
 	E(recalc_store_size)
 
 /**
@@ -3646,6 +3672,16 @@ static pack_result exmdb_push(EXT_PUSH &x, const exresp_autoreply_tsquery &d)
 	return x.p_uint64(d.tdiff);
 }
 
+static pack_result exmdb_pull(EXT_PULL &x, exresp_appt_meetreq_overlap &d)
+{
+	return x.g_uint32(&d.out_status);
+}
+
+static pack_result exmdb_push(EXT_PUSH &x, const exresp_appt_meetreq_overlap &d)
+{
+	return x.p_uint32(d.out_status);
+}
+
 #define RSP_WITHOUT_ARGS \
 	E(ping_store) \
 	E(remove_store_properties) \
@@ -3776,7 +3812,8 @@ static pack_result exmdb_push(EXT_PUSH &x, const exresp_autoreply_tsquery &d)
 	E(check_contact_address) \
 	E(get_public_folder_unread_count) \
 	E(store_eid_to_user) \
-	E(autoreply_tsquery)
+	E(autoreply_tsquery) \
+	E(appt_meetreq_overlap)
 
 /* exmdb_callid::connect, exmdb_callid::listen_notification not included */
 /*

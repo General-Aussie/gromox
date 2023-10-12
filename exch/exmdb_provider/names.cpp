@@ -147,6 +147,7 @@ static constexpr const char *exmdb_rpc_names[] = {
 	E(AUTOREPLY_TSQUERY),
 	E(AUTOREPLY_TSUPDATE),
 	E(GET_MAPPING_REPLID),
+	E(APPT_MEETREQ_OVERLAP),
 	E(RECALC_STORE_SIZE),
 };
 #undef E

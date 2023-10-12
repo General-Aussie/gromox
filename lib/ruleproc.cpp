@@ -846,6 +846,231 @@ static int get_policy_from_message_content(rxparam par)
     return flags;
 }
 
+static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy) {
+	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
+	uint8_t tmp_byte, tmp_bin;
+	TARRAY_SET *prcpts;
+	const uint8_t responseDeclined = olResponseDeclined;
+	const uint8_t responseAccepted = olResponseAccepted;
+	const uint8_t busy = olBusy;
+    std::vector<freebusy_event> intersect;
+	char buffer[100];
+
+	auto pmsg = par.ctnt; 
+	pmsg = message_content_init();
+	if (pmsg == nullptr)
+		return ecError;
+	auto cl_1 = make_scope_exit([&]() {
+		if (pmsg != nullptr)
+			message_content_free(pmsg);
+	});
+
+	if (pmsg->proplist.count == 0)
+		return ecError;
+	mlog(LV_ERR, "W-PREC: proplist count is not zero %s", par.cur.dir.c_str());
+	
+	auto pmessage_class = pmsg->proplist.get<const char>(PR_MESSAGE_CLASS);
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
+	if (pmessage_class == nullptr){
+		pmessage_class = pmsg->proplist.get<char>(PR_MESSAGE_CLASS_A);
+		mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS_A: %s", pmessage_class);
+	}
+	if (pmessage_class == nullptr){
+		pmessage_class = "IPM.Note";
+		mlog(LV_ERR, "W-PREC: IPM for note: %s", pmessage_class);
+	}
+	/* ignore ATTENDEE when METHOD is "PUBLIC" */
+	if (strcasecmp(pmessage_class, "IPM.Appointment") == 0)
+		return ecSuccess;
+	
+	prcpts = tarray_set_init();
+	if (prcpts == nullptr)
+		return ecError;
+	tmp_byte = 0;
+	pmsg->set_rcpts_internal(prcpts);
+
+	auto pdisplay_name = par.ctnt->proplist.get<char>(PR_DISPLAY_NAME);
+	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME: %s", pdisplay_name);
+
+    auto cal_eid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
+    if (!cal_eid) {
+		snprintf(buffer, sizeof(buffer), "Unable to open calendar");
+        mlog(LV_ERR, "Unable to open calendar.\n");
+        return ecError;
+    }
+
+	static constexpr uint8_t fixed_true = 1;
+	mlog(LV_ERR, "W-PREC: About to filter the messages from folder %s", par.cur.dir.c_str());
+
+	RESTRICTION_EXIST rst_11 = {PR_MESSAGE_CLASS};
+	RESTRICTION_PROPERTY rst_6 = {RELOP_EQ, PR_MESSAGE_CLASS, {PR_MESSAGE_CLASS, deconst("IPM.Schedule.Meeting.Request")}};
+	RESTRICTION_PROPERTY rst_12 = {RELOP_EQ, PR_RESPONSE_REQUESTED, {PR_RESPONSE_REQUESTED, deconst(&fixed_true)}};
+	RESTRICTION_PROPERTY rst_13 = {RELOP_NE, PR_PROCESSED, {PR_PROCESSED, deconst(&fixed_true)}};
+	RESTRICTION rst_C3[4] = {{RES_EXIST, {&rst_11}}, {RES_PROPERTY, {&rst_6}}, {RES_PROPERTY, {&rst_12}}, {RES_PROPERTY, {&rst_13}}};
+	RESTRICTION_AND_OR rst_C3_and = {std::size(rst_C3), rst_C3};
+	RESTRICTION rst_10 = {RES_AND, {&rst_C3_and}};
+
+	// Load the complex restriction to the table
+	uint32_t table_id = 0, row_count = 0;
+	if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, par.cur.fid, nullptr,
+	    TABLE_FLAG_ASSOCIATED, &rst_10, nullptr, &table_id, &row_count))
+		mlog(LV_ERR, "W-PREC: Cannot load content table %s", par.cur.dir.c_str());
+		return ecError;
+	mlog(LV_ERR, "W-PREC: Loaded table successfully %s", par.cur.dir.c_str());
+
+	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
+	mlog(LV_ERR, "W-PREC: unoaded table successfully %s", par.cur.dir.c_str());
+
+	// Define the property tags to retrieve
+	uint32_t proptag_buff[] = {
+		PR_ENTRYID, PR_MESSAGE_CLASS, PR_START_DATE, PR_END_DATE, PR_RESPONSE_REQUESTED,
+		PR_REPLY_REQUESTED, PR_RECIPIENT_TRACKSTATUS, PidLidRecurring, PidLidResponseStatus,
+		PidLidBusyStatus, PR_PROCESSED,
+	};
+
+	const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
+	TARRAY_SET rows;
+	if (!exmdb_client::query_table(par.cur.dir.c_str(), nullptr, CP_ACP, table_id, &proptags, 0, row_count, &rows)){
+		snprintf(buffer, sizeof(buffer), "Unable to query table for processing meeting: %d\n", ecError);
+		mlog(LV_ERR, "W-PREC: cannot query tabele %s", par.cur.dir.c_str());
+    	return ecError;
+	}
+	mlog(LV_ERR, "W-PREC: querired table successfully %s", par.cur.dir.c_str());
+
+    for (size_t i = 0; i < rows.count; ++i) {
+        auto entry_id = rows.pparray[i]->get<const uint32_t>(PR_ENTRYID);
+    	static PROPTAG_ARRAY pt = {sizeof(entry_id) / sizeof(entry_id[0]), deconst(entry_id)};
+
+		PROPERTY_NAME propname_buff[] = {
+			{MNID_ID, PSETID_APPOINTMENT, PidLidRecurring},
+			{MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus},
+			{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
+		};
+
+		const PROPNAME_ARRAY propnames = {std::size(propname_buff), deconst(propname_buff)};
+		PROPID_ARRAY propids;
+		if (!exmdb_client::get_named_propids(dir, false, &propnames, &propids))
+			return ecError;
+		
+		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
+		mlog(LV_ERR, "W-PREC: PR_START_DATE %s", start);
+		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
+		mlog(LV_ERR, "W-PREC: PR_START_DATE %s", end);
+		auto start_whole = rop_util_nttime_to_unix(*start);
+		auto end_whole = rop_util_nttime_to_unix(*end);
+        auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+
+		TPROPVAL_ARRAY itemProps{};
+        if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &itemProps))
+            return ecError;
+
+        // static const PROPERTY_NAME ResponseStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus};
+        // const char* username = itemProps.get<char>(user_name_tag);
+		uint32_t out_status = 0;
+
+        if (!exmdb_client::appt_meetreq_overlap(dir, pdisplay_name, start_whole, end_whole, &out_status)){
+			snprintf(buffer, sizeof(buffer), "Meeting overlap error");
+			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
+            return ecError;
+		}
+		mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
+		bool isRoomMailbox = true; 
+		bool isEquipmentMailbox = true;
+
+        if (isRoomMailbox || isEquipmentMailbox) {
+            // Room mailbox specific processing
+            if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
+                strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
+                    if (flags != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
+						if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+							return ecError;
+						snprintf(buffer, sizeof(buffer), "Meeting Declined");
+                        mlog(LV_INFO, "Declined due to recurrence against non-recurring policy.\n");
+                        return ecSuccess;
+                    }
+                
+					if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
+						// non-recurring appointments
+						if (flags == nullptr || *flags == 0) {
+							// At least one conflict
+							if (out_status == 1) {
+								// itemProps.set(ResponseStatus.lid, &responseDeclined);
+								// itemProps.set(ResponseStatus, &olResponseDeclined);
+								// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+									// return ecError;
+								if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+									return ecError;
+								if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+									return ecError;
+								snprintf(buffer, sizeof(buffer), "Meeting Declined");
+								mlog(LV_INFO, "Declined due to conflict.\n");
+								return ecSuccess;
+							}   
+						}       
+						// recurring appointments
+						if(out_status == 1) {
+							// At least one conflict
+							// itemProps.set(ResponseStatus.lid, &responseDeclined);
+							// itemProps.set(ResponseStatus, &olResponseDeclined);
+							// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+								// return ecError;
+							if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+									return ecError;
+							if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+								return ecError;
+							snprintf(buffer, sizeof(buffer), "Meeting Declined");
+							mlog(LV_INFO, "Declined due to conflict.\n");
+							return ecSuccess;
+						}   
+					}
+					// itemProps.set(ResponseStatus.lid, &responseAccepted);
+					if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
+						return ecError;
+					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+						return ecError;
+					if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
+						return ecError;
+					// itemProps.set(ResponseStatus, &olResponseDeclined);
+					// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+						// return ecError;
+					snprintf(buffer, sizeof(buffer), "Meeting Accepted");
+					mlog(LV_ERR, "Accepted\n");
+				}
+			if (pmsg->proplist.set(PR_RESPONSE_REQUESTED, &tmp_byte) != 0 ||
+				pmsg->proplist.set(PR_REPLY_REQUESTED, &tmp_byte) != 0)
+					return ecError;
+			return ecSuccess;
+
+			tmp_bin = 1;
+			// Set PR_RECIPIENT_TRACKSTATUS
+			if (!pmsg->proplist.set(PR_RECIPIENT_TRACKSTATUS, &tmp_bin))
+				return ecError;
+			
+			uint64_t change_num = 0, modtime = 0;
+			if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
+				return ecRpcFailed;
+			auto change_key = xid_to_bin({GUID{}, change_num});
+			if (change_key == nullptr)
+				return ecServerOOM;
+			const TAGGED_PROPVAL valdata[] = {
+				{PidTagChangeNumber, &change_num},
+				{PR_CHANGE_KEY, change_key},
+				{PR_LOCAL_COMMIT_TIME, &modtime},
+				{PR_LAST_MODIFICATION_TIME, &modtime},
+			};
+			const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+			if (valdata[1].pvalue == nullptr)
+				return ecServerOOM;
+			PROBLEM_ARRAY problems{};
+			if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+				nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+				return ecRpcFailed;
+			return ecSuccess;
+	    }
+    }
+    return ecSuccess;
+}
+
 ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
     const char *ev_to, eid_t folder_id, eid_t msg_id) try
 {
@@ -870,8 +1095,18 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
 
-	if(!get_policy_from_message_content(par))
-		mlog(LV_ERR, "W-PREC: check policy failed %s", par.cur.dir.c_str());
+	int policy = get_policy_from_message_content(par)
+	mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
+
+	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
+	err = process_meeting_requests(par, dir, policy);
+	if (err != ecSuccess){
+		return err;
+		mlog(LV_WARN, "W-1554: Meeting Processed Done %s", strerror(ecSuccess));
+	}
+	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());	
+
 	for (auto &&rule : rule_list) {
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)

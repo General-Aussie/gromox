@@ -3945,3 +3945,46 @@ BOOL exmdb_server::rule_new_message(const char *dir, const char *username,
 	mlog(LV_ERR, "E-2034: ENOMEM");
 	return false;
 }
+
+/***
+ * @dir: mailbox
+ * @username: username of the mailbox which is going to be used by get_freebusy
+ * @start_time: start time of the new appointment
+ * @end_time: end time of the new appointment
+ *
+ * Compares the meeting request indicated by @appt_mid whether it conflicts with any existing appointments in @fid.
+ * @out_status will be filled with value 1 if there is a timeslot conflict between any appointment and the new meeting request.
+ */
+BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t start_time, uint64_t end_time, uint32_t *out_status)
+{
+    // Assume no conflict initially
+    *out_status = 0;
+
+    // Retrieve free/busy events within the specified time range
+    std::vector<freebusy_event> freebusyData;
+    if (!get_freebusy(username, dir, start_time, end_time, freebusyData))
+        return FALSE;
+
+    // Iterate through free/busy events and check for conflicts
+    for (const freebusy_event &event : freebusyData)
+    {
+        uint64_t event_start_time = rop_util_unix_to_nttime(event.start_time);
+        uint64_t event_end_time = rop_util_unix_to_nttime(event.end_time);
+
+        bool is_recurring = event.details && event.details->is_recurring;
+
+        // Check for overlap with existing appointments
+        if ((event_start_time >= start_time && event_start_time <= end_time) ||
+            (event_end_time >= start_time && event_end_time <= end_time) ||
+            (event_start_time < start_time && event_end_time > end_time) ||
+            (is_recurring && event_end_time >= start_time) ||
+            (!is_recurring && event_start_time <= end_time))
+        {
+            // Conflict found, set the status and return
+            *out_status = 1;
+            return TRUE;
+        }
+    }
+    // No conflicts found
+    return TRUE;
+}

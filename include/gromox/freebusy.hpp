@@ -37,4 +37,5 @@ struct freebusy_tags
 		timezonestruct = 0;
 };
 
+extern GX_EXPORT bool goid_to_icaluid(BINARY *, std::string &);
 extern GX_EXPORT bool get_freebusy(const char *, const char *, time_t, time_t, std::vector<freebusy_event> &);

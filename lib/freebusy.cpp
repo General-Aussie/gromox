@@ -314,7 +314,7 @@ static int goid_to_icaluid2(BINARY *gobj, std::string &uid_buf)
 	return 2;
 }
 
-static bool goid_to_icaluid(BINARY *gobj, std::string &uid_buf)
+bool goid_to_icaluid(BINARY *gobj, std::string &uid_buf)
 {
 	auto ret = goid_to_icaluid2(gobj, uid_buf);
 	if (ret < 0)
