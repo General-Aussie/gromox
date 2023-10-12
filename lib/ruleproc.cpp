@@ -29,6 +29,9 @@
 #define POLICY_DECLINE_RECURRING_MEETING_REQUESTS    0x0002
 #define POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS  0x0004
 
+using namespace gromox;
+namespace exmdb_client = exmdb_client_remote;
+
 namespace {
 /**
  * @rule_id:	if @extended, message id of the extrule, else rule id.
@@ -806,44 +809,6 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 	return ecSuccess;
 }
 
-static int get_policy_from_message_content(const char* dir)
-{
-	int flags = 0;
-
-	static constexpr uint32_t policytag[] = {PR_POLICY_TAG};
-    static constexpr PROPTAG_ARRAY pt = {std::size(policytag), deconst(policytag)};
-
-
-    TPROPVAL_ARRAY propList{};
-	if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &propList))
-        return ecError;
-    for (size_t i = 0; i < propList.count; ++i)
-    {
-        auto prop = propList.ppropval[i];
-
-		// Check for PR_PROCESS_MEETING_REQUESTS, PR_DECLINE_CONFLICTING_MEETING_REQUESTS,
-		// and PR_DECLINE_RECURRING_MEETING_REQUESTS properties
-		switch (prop.proptag)
-		{
-			case PR_SCHDINFO_AUTO_ACCEPT_APPTS:
-				if (prop.pvalue)
-					flags |= POLICY_PROCESS_MEETING_REQUESTS;
-				break;
-
-			case PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS:
-				if (prop.pvalue)
-					flags |= POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS;
-				break;
-
-			case PR_SCHDINFO_DISALLOW_RECURRING_APPTS:
-				if (prop.pvalue)
-					flags |= POLICY_DECLINE_RECURRING_MEETING_REQUESTS;
-				break;
-		}
-	}
-    return flags;
-}
-
 static ec_error_t rx_resource_type(const char *dir, bool *isEquipmentMailbox, bool *isRoomMailbox)
 {
     static constexpr uint32_t tags[] = {PR_DISPLAY_TYPE_EX};
@@ -901,11 +866,11 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	bool isRoomMailbox = false;
 	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
-	err = rx_resource_type(const char *dir, bool *isEquipmentMailbox, bool *isRoomMailbox);
+	err = rx_resource_type(dir, &isEquipmentMailbox, &isRoomMailbox);
 	if (err != ecSuccess)
 			return err;
-	mlog(LV_ERR, "W-PREC: check resource type is %s", isEquipmentMailbox);
-	mlog(LV_ERR, "W-PREC: check resource type is %s", isRoomMailbox);
+	mlog(LV_ERR, "W-PREC: check resource type is %d", isEquipmentMailbox);
+	mlog(LV_ERR, "W-PREC: check resource type is %d", isRoomMailbox);
 	for (auto &&rule : rule_list) {
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)
