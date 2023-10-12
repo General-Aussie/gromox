@@ -857,7 +857,7 @@ struct exreq_appt_meetreq_overlap : public exreq {
 	char *username;
 	uint64_t start_time = 0; 
 	uint64_t end_time = 0;
-}
+};
 
 struct exreq_recalc_store_size : public exreq {
 	uint32_t flags = 0;
