@@ -816,8 +816,9 @@ static int get_policy_from_message_content(rxparam par)
 	mlog(LV_ERR, "W-PREC: check policy 2 %s", par.cur.dir.c_str());
 
 	mlog(LV_ERR, "W-PREC: check class %s", par.cur.dir.c_str());
-	auto classs = par.ctnt->proplist.get<char>(PR_POLICY_TAG);
-	mlog(LV_ERR, "W-PREC: check policy 3 %s", par.cur.dir.c_str());
+	auto classs = par.ctnt->proplist.get<const* char>(PR_POLICY_TAG);
+	mlog(LV_ERR, "W-PREC: check policy 3 %c", classs);
+
     for (size_t i = 0; i < par.ctnt->proplist.count; ++i)
     {
 		mlog(LV_ERR, "W-PREC: check policy loop %s", par.cur.dir.c_str());
@@ -872,10 +873,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
 
 	if(!get_policy_from_message_content(par))
-		continue;
-
-	mlog(LV_ERR, "W-PREC: check resource type is %d", isEquipmentMailbox);
-	mlog(LV_ERR, "W-PREC: check resource type is %d", isRoomMailbox);
+		mlog(LV_ERR, "W-PREC: check policy failed %s", par.cur.fid);
 	for (auto &&rule : rule_list) {
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)
