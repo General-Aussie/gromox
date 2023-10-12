@@ -1077,17 +1077,17 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)
 			return err;
-		if (par.del)
-			break;
+		// if (par.del)
+		// 	break;
 	}
-	if (par.del) {
-		const EID_ARRAY ids = {1, reinterpret_cast<uint64_t *>(&par.cur.mid)};
-		BOOL partial;
-		if (!exmdb_client::delete_messages(par.cur.dir.c_str(), 0,
-		    CP_ACP, nullptr, par.cur.fid, &ids, true/*hard*/, &partial))
-			mlog(LV_DEBUG, "ruleproc: deletion unsuccessful");
-		return ecSuccess;
-	}
+	// if (par.del) {
+	// 	const EID_ARRAY ids = {1, reinterpret_cast<uint64_t *>(&par.cur.mid)};
+	// 	BOOL partial;
+	// 	if (!exmdb_client::delete_messages(par.cur.dir.c_str(), 0,
+	// 	    CP_ACP, nullptr, par.cur.fid, &ids, true/*hard*/, &partial))
+	// 		mlog(LV_DEBUG, "ruleproc: deletion unsuccessful");
+	// 	return ecSuccess;
+	// }
 	if (!exmdb_client::notify_new_mail(par.cur.dir.c_str(),
 	    par.cur.fid, par.cur.mid))
 		mlog(LV_ERR, "ruleproc: newmail notification unsuccessful");
