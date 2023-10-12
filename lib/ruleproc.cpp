@@ -7,11 +7,15 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <fmt/core.h>
+#include <fmt/format.h>
 #include <gromox/element_data.hpp>
 #include <gromox/exmdb_client.hpp>
+#include <gromox/exmdb_server.hpp>
 #include <gromox/exmdb_rpc.hpp>
 #include <gromox/ext_buffer.hpp>
 #include <gromox/mapidefs.h>
+#include <gromox/freebusy.hpp>
 #include <gromox/mapierr.hpp>
 #include <gromox/mapitags.hpp>
 #include <gromox/pcl.hpp>
@@ -20,8 +24,10 @@
 #include <gromox/scope.hpp>
 #include <gromox/util.hpp>
 
-using namespace gromox;
-namespace exmdb_client = exmdb_client_remote;
+// Extended MAPI Definitions
+#define POLICY_PROCESS_MEETING_REQUESTS              0x0001
+#define POLICY_DECLINE_RECURRING_MEETING_REQUESTS    0x0002
+#define POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS  0x0004
 
 namespace {
 /**
@@ -800,6 +806,76 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 	return ecSuccess;
 }
 
+static int get_policy_from_message_content(const char* dir)
+{
+	int flags = 0;
+
+	static constexpr uint32_t policytag[] = {PR_POLICY_TAG};
+    static constexpr PROPTAG_ARRAY pt = {std::size(policytag), deconst(policytag)};
+
+
+    TPROPVAL_ARRAY propList{};
+	if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &propList))
+        return ecError;
+    for (size_t i = 0; i < propList.count; ++i)
+    {
+        auto prop = propList.ppropval[i];
+
+		// Check for PR_PROCESS_MEETING_REQUESTS, PR_DECLINE_CONFLICTING_MEETING_REQUESTS,
+		// and PR_DECLINE_RECURRING_MEETING_REQUESTS properties
+		switch (prop.proptag)
+		{
+			case PR_SCHDINFO_AUTO_ACCEPT_APPTS:
+				if (prop.pvalue)
+					flags |= POLICY_PROCESS_MEETING_REQUESTS;
+				break;
+
+			case PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS:
+				if (prop.pvalue)
+					flags |= POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS;
+				break;
+
+			case PR_SCHDINFO_DISALLOW_RECURRING_APPTS:
+				if (prop.pvalue)
+					flags |= POLICY_DECLINE_RECURRING_MEETING_REQUESTS;
+				break;
+		}
+	}
+    return flags;
+}
+
+static ec_error_t rx_resource_type(const char *dir, bool *isEquipmentMailbox, bool *isRoomMailbox)
+{
+    static constexpr uint32_t tags[] = {PR_DISPLAY_TYPE_EX};
+    static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
+    TPROPVAL_ARRAY props{};
+	char buffer[100];
+
+    if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &props)) {
+		snprintf(buffer, sizeof(buffer), "Error in rx_resource_type: %d\n", ecError);
+        return ecError;
+	}
+    
+    auto displayType = props.get<uint8_t>(PR_DISPLAY_TYPE_EX);
+
+    if (displayType != nullptr) {
+        enum display_type dtypx = DT_MAILUSER; // Default to DT_MAILUSER
+
+        // Parse the display type from the property value
+        dtypx = static_cast<enum display_type>(strtoul(reinterpret_cast<const char*>(*displayType), nullptr, 0));
+        
+        if (dtypx == DT_ROOM) {
+			snprintf(buffer, sizeof(buffer), "Roommailbox");
+            *isRoomMailbox = true;
+        } else if (dtypx == DT_EQUIPMENT) {
+			snprintf(buffer, sizeof(buffer), "Equipment mailbox");
+            *isEquipmentMailbox = true;
+        }
+    }
+	snprintf(buffer, sizeof(buffer), "resource type checked successful");
+    return ecSuccess;
+}
+
 ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
     const char *ev_to, eid_t folder_id, eid_t msg_id) try
 {
@@ -820,6 +896,16 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	if (!exmdb_client::read_message(par.cur.dir.c_str(), nullptr, CP_ACP,
 	    par.cur.mid, &par.ctnt))
 		return ecError;
+	
+	bool isEquipmentMailbox = false;
+	bool isRoomMailbox = false;
+	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
+	err = rx_resource_type(const char *dir, bool *isEquipmentMailbox, bool *isRoomMailbox);
+	if (err != ecSuccess)
+			return err;
+	mlog(LV_ERR, "W-PREC: check resource type is %s", isEquipmentMailbox);
+	mlog(LV_ERR, "W-PREC: check resource type is %s", isRoomMailbox);
 	for (auto &&rule : rule_list) {
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)

@@ -991,9 +991,9 @@ enum {
 	// PR_SCHDINFO_APPT_TOMBSTONE = PROP_TAG(PT_BINARY, 0x686A), /* PidTagScheduleInfoAppointmentTombstone */
 	// PR_DELEGATE_FLAGS = PROP_TAG(PT_MV_LONG, 0x686B), /* PidTagDelegateFlags */
 	// PR_SCHDINFO_FREEBUSY = PROP_TAG(PT_BINARY, 0x686C), /* PidTagScheduleInfoFreeBusy */
-	// PR_SCHDINFO_AUTO_ACCEPT_APPTS = PROP_TAG(PT_BOOLEAN, 0x686D), /* PidTagScheduleInfoAutoAcceptAppointments */
-	// PR_SCHDINFO_DISALLOW_RECURRING_APPTS = PROP_TAG(PT_BOOLEAN, 0x686E), /* PidTagScheduleInfoDisallowRecurringAppts */
-	// PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS = PROP_TAG(PT_BOOLEAN, 0x686F), /* PidTagScheduleInfoDisallowOverlappingAppts */
+	PR_SCHDINFO_AUTO_ACCEPT_APPTS = PROP_TAG(PT_BOOLEAN, 0x686D), /* PidTagScheduleInfoAutoAcceptAppointments */
+	PR_SCHDINFO_DISALLOW_RECURRING_APPTS = PROP_TAG(PT_BOOLEAN, 0x686E), /* PidTagScheduleInfoDisallowRecurringAppts */
+	PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS = PROP_TAG(PT_BOOLEAN, 0x686F), /* PidTagScheduleInfoDisallowOverlappingAppts */
 	// PR_WLINK_CLIENTID = PROP_TAG(PT_BINARY, 0x6890), /* PidTagWlinkClientID */
 	// PR_WLINK_AB_EXSTOREEID = PROP_TAG(PT_BINARY, 0x6891), /* PidTagWlinkAddressBookStoreEID */
 	// PR_WLINK_RO_GROUP_TYPE = PROP_TAG(PT_LONG, 0x6892), /* PidTagWlinkROGroupType */
