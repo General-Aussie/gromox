@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 #include <fmt/core.h>
+#include <fmt/format.h>
 #include <libHX/io.h>
 #include <libHX/string.h>
 #include <openssl/evp.h>
@@ -24,9 +25,17 @@
 #include <gromox/cryptoutil.hpp>
 #include <gromox/database.h>
 #include <gromox/defs.h>
+#include <gromox/freebusy.hpp>
 #include <gromox/exmdb_common_util.hpp>
 #include <gromox/exmdb_provider_client.hpp>
 #include <gromox/exmdb_server.hpp>
+#include <gromox/exmdb_client.hpp>
+#include <gromox/exmdb_rpc.hpp>
+#include <gromox/mapierr.hpp>
+#include <gromox/mapitags.hpp>
+#include <gromox/pcl.hpp>
+#include <gromox/propval.hpp>
+#include <gromox/element_data.hpp>
 #include <gromox/ext_buffer.hpp>
 #include <gromox/fileio.h>
 #include <gromox/json.hpp>
@@ -46,6 +55,7 @@ using XUI = unsigned int;
 using LLU = unsigned long long;
 using namespace std::string_literals;
 using namespace gromox;
+namespace exmdb_client = exmdb_client_remote;
 
 namespace {
 

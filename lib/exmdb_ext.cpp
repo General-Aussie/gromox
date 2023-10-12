@@ -2232,16 +2232,6 @@ static pack_result exmdb_push(EXT_PUSH &x, const exreq_autoreply_tsupdate &d)
 	return x.p_str(d.peer);
 }
 
-static pack_result exmdb_pull(EXT_PULL &x, exreq_recalc_store_size &d)
-{
-	return x.g_uint32(&d.flags);
-}
-
-static pack_result exmdb_push(EXT_PUSH &x, const exreq_recalc_store_size &d)
-{
-	return x.p_uint32(d.flags);
-}
-
 static pack_result exmdb_pull(EXT_PULL &x, exreq_appt_meetreq_overlap &d)
 {
 	uint8_t tmp_byte;
@@ -2265,6 +2255,16 @@ static pack_result exmdb_push(EXT_PUSH &x, const exreq_appt_meetreq_overlap &d)
 	}
 	TRY(x.p_uint64(d.start_time));
 	return x.p_uint64(d.end_time);
+}
+
+static pack_result exmdb_pull(EXT_PULL &x, exreq_recalc_store_size &d)
+{
+	return x.g_uint32(&d.flags);
+}
+
+static pack_result exmdb_push(EXT_PUSH &x, const exreq_recalc_store_size &d)
+{
+	return x.p_uint32(d.flags);
 }
 
 #define RQ_WITH_ARGS \
