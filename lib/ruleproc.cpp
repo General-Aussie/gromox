@@ -857,16 +857,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	char buffer[100];
 
 	auto pmsg = par.ctnt; 
-	pmsg = message_content_init();
+	mlog(LV_ERR, "W-PREC: setting pmsg to par.ctnt %s", par.cur.dir.c_str());
 	if (pmsg == nullptr)
 		return ecError;
-	auto cl_1 = make_scope_exit([&]() {
-		if (pmsg != nullptr)
-			message_content_free(pmsg);
-	});
 
-	if (pmsg->proplist.count == 0)
+	if (pmsg->proplist.count == 0){
+		mlog(LV_ERR, "W-PREC: proplist count is 0 %s", par.cur.dir.c_str());
 		return ecError;
+	}
 	mlog(LV_ERR, "W-PREC: proplist count is not zero %s", par.cur.dir.c_str());
 	
 	auto pmessage_class = pmsg->proplist.get<const char>(PR_MESSAGE_CLASS);
