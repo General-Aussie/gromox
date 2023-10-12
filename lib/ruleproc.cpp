@@ -937,8 +937,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: querired table successfully %s", par.cur.dir.c_str());
 
     for (size_t i = 0; i < rows.count; ++i) {
+		mlog(LV_ERR, "W-PREC: entering for loop %s", par.cur.dir.c_str());
         auto entry_id = rows.pparray[i]->get<const uint32_t>(PR_ENTRYID);
-    	static PROPTAG_ARRAY pt = {sizeof(entry_id) / sizeof(entry_id[0]), deconst(entry_id)};
+		mlog(LV_ERR, "PR_ENTRYID: %lu", *entry_id);
+    	// static PROPTAG_ARRAY pt = {sizeof(entry_id) / sizeof(entry_id[0]), deconst(entry_id)};
 
 		PROPERTY_NAME propname_buff[] = {
 			{MNID_ID, PSETID_APPOINTMENT, PidLidRecurring},
@@ -946,10 +948,15 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
 		};
 
+		mlog(LV_ERR, "W-PREC: load propnames %s", par.cur.dir.c_str());
+
 		const PROPNAME_ARRAY propnames = {std::size(propname_buff), deconst(propname_buff)};
 		PROPID_ARRAY propids;
-		if (!exmdb_client::get_named_propids(dir, false, &propnames, &propids))
+		if (!exmdb_client::get_named_propids(dir, false, &propnames, &propids)){
+			mlog(LV_ERR, "W-PREC: cannot get names propids %s", par.cur.dir.c_str());
 			return ecError;
+		}
+		mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
 		
 		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
 		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
