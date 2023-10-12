@@ -939,7 +939,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
     for (size_t i = 0; i < rows.count; ++i) {
 		mlog(LV_ERR, "W-PREC: entering for loop %s", par.cur.dir.c_str());
         auto entry_id = rows.pparray[i]->get<const uint32_t>(PR_ENTRYID);
-		mlog(LV_ERR, "PR_ENTRYID: %lu", *entry_id);
+		mlog(LV_ERR, "PR_ENTRYID: %u", *entry_id);
+		mlog(LV_ERR, "W-PREC: entryid gotten %s", par.cur.dir.c_str());
     	// static PROPTAG_ARRAY pt = {sizeof(entry_id) / sizeof(entry_id[0]), deconst(entry_id)};
 
 		PROPERTY_NAME propname_buff[] = {
@@ -966,9 +967,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto end_whole = rop_util_nttime_to_unix(*end);
         auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
 
-		TPROPVAL_ARRAY itemProps{};
-        if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &itemProps))
-            return ecError;
+		// TPROPVAL_ARRAY itemProps{};
+        // if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &itemProps))
+        //     return ecError;
 
         // static const PROPERTY_NAME ResponseStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus};
         // const char* username = itemProps.get<char>(user_name_tag);
