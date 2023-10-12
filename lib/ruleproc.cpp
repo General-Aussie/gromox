@@ -848,7 +848,7 @@ static int get_policy_from_message_content(rxparam par)
 
 static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy) {
 	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
-	uint8_t tmp_byte, tmp_bin;
+	uint8_t tmp_bin;
 	TARRAY_SET *prcpts;
 	const uint8_t responseDeclined = olResponseDeclined;
 	const uint8_t responseAccepted = olResponseAccepted;
