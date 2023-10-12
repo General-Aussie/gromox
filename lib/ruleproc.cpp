@@ -897,185 +897,152 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
         return ecError;
     }
 
-	static constexpr uint8_t fixed_true = 1;
-	mlog(LV_ERR, "W-PREC: About to filter the messages from folder %s", par.cur.dir.c_str());
-
-	RESTRICTION_EXIST rst_11 = {PR_MESSAGE_CLASS};
-	RESTRICTION_PROPERTY rst_6 = {RELOP_EQ, PR_MESSAGE_CLASS, {PR_MESSAGE_CLASS, deconst("IPM.Schedule.Meeting.Request")}};
-	RESTRICTION_PROPERTY rst_12 = {RELOP_EQ, PR_RESPONSE_REQUESTED, {PR_RESPONSE_REQUESTED, deconst(&fixed_true)}};
-	RESTRICTION_PROPERTY rst_13 = {RELOP_NE, PR_PROCESSED, {PR_PROCESSED, deconst(&fixed_true)}};
-	RESTRICTION rst_C3[4] = {{RES_EXIST, {&rst_11}}, {RES_PROPERTY, {&rst_6}}, {RES_PROPERTY, {&rst_12}}, {RES_PROPERTY, {&rst_13}}};
-	RESTRICTION_AND_OR rst_C3_and = {std::size(rst_C3), rst_C3};
-	RESTRICTION rst_10 = {RES_AND, {&rst_C3_and}};
-
-	// Load the complex restriction to the table
-	uint32_t table_id = 0, row_count = 0;
-	if (!exmdb_client::load_content_table(dir, CP_ACP, par.cur.fid, nullptr,
-	    TABLE_FLAG_ASSOCIATED, &rst_10, nullptr, &table_id, &row_count)){
-		mlog(LV_ERR, "W-PREC: Cannot load content table %s", par.cur.dir.c_str());
-		return ecError;
-		}
-	mlog(LV_ERR, "W-PREC: Loaded table successfully %s", par.cur.dir.c_str());
-
-	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id); });
-	mlog(LV_ERR, "W-PREC: unoaded table successfully %s", par.cur.dir.c_str());
-
-	// Define the property tags to retrieve
-	uint32_t proptag_buff[] = {
+	static constexpr uint32_t tags[] = {
 		PR_ENTRYID, PR_MESSAGE_CLASS, PR_START_DATE, PR_END_DATE, PR_RESPONSE_REQUESTED,
 		PR_REPLY_REQUESTED, PR_RECIPIENT_TRACKSTATUS, PidLidRecurring, PidLidResponseStatus,
 		PidLidBusyStatus, PR_PROCESSED,
 	};
+	static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
+	TPROPVAL_ARRAY props{};
+	if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &props))
+		return ecError;
 
-	const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
-	TARRAY_SET rows;
-	if (!exmdb_client::query_table(par.cur.dir.c_str(), nullptr, CP_ACP, table_id, &proptags, 0, row_count, &rows)){
-		snprintf(buffer, sizeof(buffer), "Unable to query table for processing meeting: %d\n", ecError);
-		mlog(LV_ERR, "W-PREC: cannot query tabele %s", par.cur.dir.c_str());
-    	return ecError;
+    auto entry_id = rows.pparray[i]->get<const uint32_t>(PR_ENTRYID);
+	mlog(LV_ERR, "PR_ENTRYID: %u", *entry_id);
+	mlog(LV_ERR, "W-PREC: entryid gotten %s", par.cur.dir.c_str());
+    // static PROPTAG_ARRAY pt = {sizeof(entry_id) / sizeof(entry_id[0]), deconst(entry_id)};
+
+	PROPERTY_NAME propname_buff[] = {
+		{MNID_ID, PSETID_APPOINTMENT, PidLidRecurring},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
+	};
+
+	mlog(LV_ERR, "W-PREC: load propnames %s", par.cur.dir.c_str());
+
+	const PROPNAME_ARRAY propnames = {std::size(propname_buff), deconst(propname_buff)};
+	PROPID_ARRAY propids;
+	if (!exmdb_client::get_named_propids(dir, false, &propnames, &propids)){
+		mlog(LV_ERR, "W-PREC: cannot get names propids %s", par.cur.dir.c_str());
+		return ecError;
 	}
-	mlog(LV_ERR, "W-PREC: querired table successfully %s", par.cur.dir.c_str());
-	mlog(LV_ERR, "W-PREC: about to enter for loop %s", par.cur.dir.c_str());
-    for (size_t i = 0; i < rows.count; ++i) {
-		mlog(LV_ERR, "W-PREC: entering for loop %s", par.cur.dir.c_str());
-        auto entry_id = rows.pparray[i]->get<const uint32_t>(PR_ENTRYID);
-		mlog(LV_ERR, "PR_ENTRYID: %u", *entry_id);
-		mlog(LV_ERR, "W-PREC: entryid gotten %s", par.cur.dir.c_str());
-    	// static PROPTAG_ARRAY pt = {sizeof(entry_id) / sizeof(entry_id[0]), deconst(entry_id)};
-
-		PROPERTY_NAME propname_buff[] = {
-			{MNID_ID, PSETID_APPOINTMENT, PidLidRecurring},
-			{MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus},
-			{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
-		};
-
-		mlog(LV_ERR, "W-PREC: load propnames %s", par.cur.dir.c_str());
-
-		const PROPNAME_ARRAY propnames = {std::size(propname_buff), deconst(propname_buff)};
-		PROPID_ARRAY propids;
-		if (!exmdb_client::get_named_propids(dir, false, &propnames, &propids)){
-			mlog(LV_ERR, "W-PREC: cannot get names propids %s", par.cur.dir.c_str());
-			return ecError;
-		}
-		mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
+	mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
 		
-		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
-		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
-		mlog(LV_ERR, "Start date: %lu", *start);
-		mlog(LV_ERR, "End date: %lu", *end);
-		auto start_whole = rop_util_nttime_to_unix(*start);
-		auto end_whole = rop_util_nttime_to_unix(*end);
-        auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+	auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
+	auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
+	mlog(LV_ERR, "Start date: %lu", *start);
+	mlog(LV_ERR, "End date: %lu", *end);
+	auto start_whole = rop_util_nttime_to_unix(*start);
+	auto end_whole = rop_util_nttime_to_unix(*end);
+    auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
 
-		// TPROPVAL_ARRAY itemProps{};
-        // if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &itemProps))
-        //     return ecError;
+	// TPROPVAL_ARRAY itemProps{};
+    // if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &itemProps))
+    //     return ecError;
 
-        // static const PROPERTY_NAME ResponseStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus};
-        // const char* username = itemProps.get<char>(user_name_tag);
-		uint32_t out_status = 0;
+    // static const PROPERTY_NAME ResponseStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus};
+    // const char* username = itemProps.get<char>(user_name_tag);
+	uint32_t out_status = 0;
 
-        if (!exmdb_client::appt_meetreq_overlap(dir, pdisplay_name, start_whole, end_whole, &out_status)){
-			snprintf(buffer, sizeof(buffer), "Meeting overlap error");
-			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
-            return ecError;
-		}
-		mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
-		bool isRoomMailbox = true; 
-		bool isEquipmentMailbox = true;
+    if (!exmdb_client::appt_meetreq_overlap(dir, pdisplay_name, start_whole, end_whole, &out_status)){
+		snprintf(buffer, sizeof(buffer), "Meeting overlap error");
+		mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
+        return ecError;
+	}
+	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
+	bool isRoomMailbox = true; 
+	bool isEquipmentMailbox = true;
 
-        if (isRoomMailbox || isEquipmentMailbox) {
-			mlog(LV_ERR, "W-PREC: entering if statement %s", par.cur.dir.c_str());
-            // Room mailbox specific processing
-            if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
-                strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
-					mlog(LV_ERR, "W-PREC: message is a meeting request %s", par.cur.dir.c_str());
-                    if (flags != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
-						if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-							return ecError;
-						snprintf(buffer, sizeof(buffer), "Meeting Declined");
-                        mlog(LV_INFO, "Declined due to recurrence against non-recurring policy.\n");
-                    }
+    if (isRoomMailbox || isEquipmentMailbox) {
+		mlog(LV_ERR, "W-PREC: entering if statement %s", par.cur.dir.c_str());
+        // Room mailbox specific processing
+        if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
+            strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
+				mlog(LV_ERR, "W-PREC: message is a meeting request %s", par.cur.dir.c_str());
+                if (flags != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
+					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+						return ecError;
+					snprintf(buffer, sizeof(buffer), "Meeting Declined");
+                    mlog(LV_INFO, "Declined due to recurrence against non-recurring policy.\n");
+                }
                 
-					if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
-						// non-recurring appointments
-						if (flags == nullptr || *flags == 0) {
-							// At least one conflict
-							if (out_status == 1) {
-								// itemProps.set(ResponseStatus.lid, &responseDeclined);
-								// itemProps.set(ResponseStatus, &olResponseDeclined);
-								// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-									// return ecError;
-								if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
-									return ecError;
-								if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-									return ecError;
-								snprintf(buffer, sizeof(buffer), "Meeting Declined");
-								mlog(LV_INFO, "Declined due to conflict.\n");
-							}   
-						}       
-						// recurring appointments
-						if(out_status == 1) {
-							// At least one conflict
+				if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
+					// non-recurring appointments
+					if (flags == nullptr || *flags == 0) {
+						// At least one conflict
+						if (out_status == 1) {
 							// itemProps.set(ResponseStatus.lid, &responseDeclined);
 							// itemProps.set(ResponseStatus, &olResponseDeclined);
 							// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 								// return ecError;
 							if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
-									return ecError;
+								return ecError;
 							if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 								return ecError;
 							snprintf(buffer, sizeof(buffer), "Meeting Declined");
 							mlog(LV_INFO, "Declined due to conflict.\n");
 						}   
-					}
-					// itemProps.set(ResponseStatus.lid, &responseAccepted);
-					if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
-						return ecError;
-					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
-						return ecError;
-					mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted %s", par.cur.dir.c_str());
-					if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
-						return ecError;
-					mlog(LV_ERR, "W-PREC: busy status set %s", par.cur.dir.c_str());
-					// itemProps.set(ResponseStatus, &olResponseDeclined);
-					// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
-						// return ecError;
-					snprintf(buffer, sizeof(buffer), "Meeting Accepted");
-					mlog(LV_ERR, "Accepted\n");
+					}       
+					// recurring appointments
+					if(out_status == 1) {
+						// At least one conflict
+						// itemProps.set(ResponseStatus.lid, &responseDeclined);
+						// itemProps.set(ResponseStatus, &olResponseDeclined);
+						// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+							// return ecError;
+						if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+							return ecError;
+						if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+							return ecError;
+						snprintf(buffer, sizeof(buffer), "Meeting Declined");
+						mlog(LV_INFO, "Declined due to conflict.\n");
+					}   
 				}
-			if (pmsg->proplist.set(PR_RESPONSE_REQUESTED, &tmp_byte) != 0 ||
-				pmsg->proplist.set(PR_REPLY_REQUESTED, &tmp_byte) != 0)
+				// itemProps.set(ResponseStatus.lid, &responseAccepted);
+				if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 					return ecError;
-
-			tmp_bin = 1;
-			// Set PR_RECIPIENT_TRACKSTATUS
-			if (!pmsg->proplist.set(PR_RECIPIENT_TRACKSTATUS, &tmp_bin))
+				if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+					return ecError;
+				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted %s", par.cur.dir.c_str());
+				if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
+					return ecError;
+				mlog(LV_ERR, "W-PREC: busy status set %s", par.cur.dir.c_str());
+				// itemProps.set(ResponseStatus, &olResponseDeclined);
+				// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+					// return ecError;
+				snprintf(buffer, sizeof(buffer), "Meeting Accepted");
+				mlog(LV_ERR, "Accepted\n");
+			}
+		if (pmsg->proplist.set(PR_RESPONSE_REQUESTED, &tmp_byte) != 0 ||
+			pmsg->proplist.set(PR_REPLY_REQUESTED, &tmp_byte) != 0)
 				return ecError;
+
+		tmp_bin = 1;
+		// Set PR_RECIPIENT_TRACKSTATUS
+		if (!pmsg->proplist.set(PR_RECIPIENT_TRACKSTATUS, &tmp_bin))
+			return ecError;
 			
-			uint64_t change_num = 0, modtime = 0;
-			if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
-				return ecRpcFailed;
-			auto change_key = xid_to_bin({GUID{}, change_num});
-			if (change_key == nullptr)
-				return ecServerOOM;
-			const TAGGED_PROPVAL valdata[] = {
-				{PidTagChangeNumber, &change_num},
-				{PR_CHANGE_KEY, change_key},
-				{PR_LOCAL_COMMIT_TIME, &modtime},
-				{PR_LAST_MODIFICATION_TIME, &modtime},
-			};
-			const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
-			if (valdata[1].pvalue == nullptr)
-				return ecServerOOM;
-			PROBLEM_ARRAY problems{};
-			if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-				nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
-				return ecRpcFailed;
-	    }
-		mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
-    }
-	mlog(LV_ERR, "W-PREC: left for loop %s", par.cur.dir.c_str());
+		uint64_t change_num = 0, modtime = 0;
+		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
+			return ecRpcFailed;
+		auto change_key = xid_to_bin({GUID{}, change_num});
+		if (change_key == nullptr)
+			return ecServerOOM;
+		const TAGGED_PROPVAL valdata[] = {
+			{PidTagChangeNumber, &change_num},
+			{PR_CHANGE_KEY, change_key},
+			{PR_LOCAL_COMMIT_TIME, &modtime},
+			{PR_LAST_MODIFICATION_TIME, &modtime},
+		};
+		const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+		if (valdata[1].pvalue == nullptr)
+			return ecServerOOM;
+		PROBLEM_ARRAY problems{};
+		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+			return ecRpcFailed;
+	}
+	mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
     return ecSuccess;
 }
 
