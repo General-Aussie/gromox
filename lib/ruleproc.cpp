@@ -809,36 +809,42 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 	return ecSuccess;
 }
 
-static ec_error_t rx_resource_type(const char *dir, bool *isEquipmentMailbox, bool *isRoomMailbox)
+static int get_policy_from_message_content(rxparam par)
 {
-    static constexpr uint32_t tags[] = {PR_DISPLAY_TYPE_EX};
-    static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
-    TPROPVAL_ARRAY props{};
-	char buffer[100];
+	mlog(LV_ERR, "W-PREC: check policy 1 %s", par.cur.dir.c_str());
+	int flags = 0;
+	mlog(LV_ERR, "W-PREC: check policy 2 %s", par.cur.dir.c_str());
 
-    if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &props)) {
-		snprintf(buffer, sizeof(buffer), "Error in rx_resource_type: %d\n", ecError);
-        return ecError;
+	mlog(LV_ERR, "W-PREC: check class %s", par.cur.dir.c_str());
+	auto classs = par.ctnt->proplist.get<char>(PR_POLICY_TAG);
+	mlog(LV_ERR, "W-PREC: check policy 3 %s", par.cur.dir.c_str());
+    for (size_t i = 0; i < par.ctnt->proplist.count; ++i)
+    {
+		mlog(LV_ERR, "W-PREC: check policy loop %s", par.cur.dir.c_str());
+        auto prop = par.ctnt->proplist.ppropval[i];
+		// Check for PR_PROCESS_MEETING_REQUESTS, PR_DECLINE_CONFLICTING_MEETING_REQUESTS,
+		// and PR_DECLINE_RECURRING_MEETING_REQUESTS properties
+		switch (prop.proptag)
+		{
+			case PR_SCHDINFO_AUTO_ACCEPT_APPTS:
+				if (prop.pvalue)
+					flags |= POLICY_PROCESS_MEETING_REQUESTS;
+				break;
+
+			case PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS:
+				if (prop.pvalue)
+					flags |= POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS;
+				break;
+
+			case PR_SCHDINFO_DISALLOW_RECURRING_APPTS:
+				if (prop.pvalue)
+					flags |= POLICY_DECLINE_RECURRING_MEETING_REQUESTS;
+				break;
+		}
 	}
-    
-    auto displayType = props.get<uint8_t>(PR_DISPLAY_TYPE_EX);
-
-    if (displayType != nullptr) {
-        enum display_type dtypx = DT_MAILUSER; // Default to DT_MAILUSER
-
-        // Parse the display type from the property value
-        dtypx = static_cast<enum display_type>(strtoul(reinterpret_cast<const char*>(*displayType), nullptr, 0));
-        
-        if (dtypx == DT_ROOM) {
-			snprintf(buffer, sizeof(buffer), "Roommailbox");
-            *isRoomMailbox = true;
-        } else if (dtypx == DT_EQUIPMENT) {
-			snprintf(buffer, sizeof(buffer), "Equipment mailbox");
-            *isEquipmentMailbox = true;
-        }
-    }
-	snprintf(buffer, sizeof(buffer), "resource type checked successful");
-    return ecSuccess;
+	mlog(LV_ERR, "W-PREC: check policy done %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: check policy done %d", flags);
+    return flags;
 }
 
 ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
@@ -862,13 +868,12 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	    par.cur.mid, &par.ctnt))
 		return ecError;
 	
-	bool isEquipmentMailbox = false;
-	bool isRoomMailbox = false;
 	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
-	err = rx_resource_type(dir, &isEquipmentMailbox, &isRoomMailbox);
-	if (err != ecSuccess)
-			return err;
+
+	if(!get_policy_from_message_content(par))
+		continue;
+
 	mlog(LV_ERR, "W-PREC: check resource type is %d", isEquipmentMailbox);
 	mlog(LV_ERR, "W-PREC: check resource type is %d", isRoomMailbox);
 	for (auto &&rule : rule_list) {

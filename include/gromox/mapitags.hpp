@@ -389,7 +389,7 @@ enum {
 	PR_CONVERSATION_ID = PROP_TAG(PT_BINARY, 0x3013), /* PidTagConversationId */
 	PR_CONVERSATION_INDEX_TRACKING = PROP_TAG(PT_BOOLEAN, 0x3016), /* PidTagConversationIndexTracking */
 	// PR_ARCHIVE_TAG = PROP_TAG(PT_BINARY, 0x3018), /* PidTagArchiveTag */
-	// PR_POLICY_TAG = PROP_TAG(PT_BINARY, 0x3019), /* PidTagPolicyTag */
+	PR_POLICY_TAG = PROP_TAG(PT_BINARY, 0x3019), /* PidTagPolicyTag */
 	// PR_RETENTION_PERIOD = PROP_TAG(PT_LONG, 0x301A), /* PidTagRetentionPeriod */
 	// PR_START_DATE_ETC = PROP_TAG(PT_BINARY, 0x301B), /* PidTagStartDateEtc */
 	// PR_RETENTION_DATE = PROP_TAG(PT_SYSTIME, 0x301C), /* PidTagRetentionDate */
