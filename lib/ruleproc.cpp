@@ -849,38 +849,39 @@ static int get_policy_from_message_content(rxparam par)
 static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipmentMailbox, bool *isRoomMailbox)
 {
 	mlog(LV_ERR, "W-PREC: entering rx resurse type %s", par.cur.dir.c_str());
-    static constexpr uint32_t tags[] = {PR_DISPLAY_TYPE_EX};
+    static constexpr uint32_t tags[] = {PR_DISPLAY_TYPE_EX, PR_DISPLAY_TYPE};
     static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
     TPROPVAL_ARRAY props{};
 
-    if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &props)) {
+    if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &props)) {
 		mlog(LV_ERR, "W-PREC: cannot get store properties for display type %s", par.cur.dir.c_str());
         return ecError;
 	}
 	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str());
     
-	auto display = par.ctnt->proplist.get<uint8_t>(PR_DISPLAY_TYPE_EX);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", display);
-	auto display1 = par.ctnt->proplist.get<uint8_t>(PR_DISPLAY_TYPE);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %s", display1);
-    auto displayType = props.get<uint8_t>(PR_DISPLAY_TYPE);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", displayType);
+	auto display = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE_EX);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", display);
+	auto display1 = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %u", display1);
+    auto displayType = props.get<const uint32_t>(PR_DISPLAY_TYPE);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", displayType);
 
-    if (display) {
-		mlog(LV_ERR, "W-PREC: entering if display %s", display);
-        enum display_type dtypx = DT_MAILUSER; // Default to DT_MAILUSER
+	auto mailuser = DT_MAILUSER;
+	auto room = DT_ROOM;
+	auto equipment = DT_EQUIPMENT;
 
-        // Parse the display type from the property value
-        dtypx = static_cast<enum display_type>(strtoul(reinterpret_cast<const char*>(*display), nullptr, 0));
-        
-        if (dtypx == DT_ROOM) {
+	if (display1 == nullptr) {
+		par.ctnt->proplist.set<const uint32_t>(PR_DISPLAY_TYPE, &mailuser);
+	} else {
+		mlog(LV_ERR, "W-PREC: entering else display %s", display);		
+		if (display1 == DT_ROOM) {
 			mlog(LV_ERR, "W-PREC: this is a room mailbox %s", par.cur.dir.c_str());
-            *isRoomMailbox = true;
-        } else if (dtypx == DT_EQUIPMENT) {
+			*isRoomMailbox = true;
+		} else if (display1 == DT_EQUIPMENT) {
 			mlog(LV_ERR, "W-PREC: this is an equipment mailbox %s", par.cur.dir.c_str());
-            *isEquipmentMailbox = true;
-        }
-    }
+			*isEquipmentMailbox = true;
+		}
+    }		
 	mlog(LV_ERR, "W-PREC: resource type checked succesful %s", par.cur.dir.c_str());
     return ecSuccess;
 }
