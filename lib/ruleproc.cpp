@@ -848,41 +848,44 @@ static int get_policy_from_message_content(rxparam par)
 
 static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipmentMailbox, bool *isRoomMailbox)
 {
-	mlog(LV_ERR, "W-PREC: entering rx resurse type %s", par.cur.dir.c_str());
+    mlog(LV_ERR, "W-PREC: entering rx resource type %s", par.cur.dir.c_str());
+
     static constexpr uint32_t tags[] = {PR_DISPLAY_TYPE_EX, PR_DISPLAY_TYPE};
     static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
     TPROPVAL_ARRAY props{};
 
     if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &props)) {
-		mlog(LV_ERR, "W-PREC: cannot get store properties for display type %s", par.cur.dir.c_str());
+        mlog(LV_ERR, "W-PREC: cannot get store properties for display type %s", par.cur.dir.c_str());
         return ecError;
-	}
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str());
-    
-	auto display = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE_EX);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", *display);
-	auto display1 = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %u", *display1);
+    }
+
+    mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str());
+
+    auto display = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE_EX);
+    mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", *display);
+    auto display1 = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE);
+    mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %u", *display1);
     auto displayType = props.get<const uint32_t>(PR_DISPLAY_TYPE);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", *displayType);
+    mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", *displayType);
 
-	auto mailuser = DT_MAILUSER;
-	auto room = DT_ROOM;
-	auto equipment = DT_EQUIPMENT;
+    auto mailuser = DT_MAILUSER;
+    auto room = DT_ROOM;
+    auto equipment = DT_EQUIPMENT;
 
-	if (display1 == nullptr) {
-		par.ctnt->proplist.set<const uint32_t>(PR_DISPLAY_TYPE, &mailuser);
-	} else {
-		mlog(LV_ERR, "W-PREC: entering else display %u", *display);		
-		if (display1 == &room) {
-			mlog(LV_ERR, "W-PREC: this is a room mailbox %s", par.cur.dir.c_str());
-			*isRoomMailbox = true;
-		} else if (display1 == &equipment) {
-			mlog(LV_ERR, "W-PREC: this is an equipment mailbox %s", par.cur.dir.c_str());
-			*isEquipmentMailbox = true;
-		}
-    }		
-	mlog(LV_ERR, "W-PREC: resource type checked succesful %s", par.cur.dir.c_str());
+    if (display1 == nullptr) {
+        par.ctnt->proplist.set(PR_DISPLAY_TYPE, &mailuser);
+    } else {
+        mlog(LV_ERR, "W-PREC: entering else display %u", *display);
+        if (*display1 == room) {
+            mlog(LV_ERR, "W-PREC: this is a room mailbox %s", par.cur.dir.c_str());
+            *isRoomMailbox = true;
+        } else if (*display1 == equipment) {
+            mlog(LV_ERR, "W-PREC: this is an equipment mailbox %s", par.cur.dir.c_str());
+            *isEquipmentMailbox = true;
+        }
+    }
+
+    mlog(LV_ERR, "W-PREC: resource type checked successfully %s", par.cur.dir.c_str());
     return ecSuccess;
 }
 
