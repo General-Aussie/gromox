@@ -861,14 +861,17 @@ static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipm
     
 	auto display = par.ctnt->proplist.get<uint8_t>(PR_DISPLAY_TYPE_EX);
 	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", display);
-    auto displayType = props.get<uint8_t>(PR_DISPLAY_TYPE_EX);
+	auto display1 = par.ctnt->proplist.get<uint8_t>(PR_DISPLAY_TYPE);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %s", display1);
+    auto displayType = props.get<uint8_t>(PR_DISPLAY_TYPE);
 	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", displayType);
 
-    if (displayType != nullptr) {
+    if (display) {
+		mlog(LV_ERR, "W-PREC: entering if display %s", display);
         enum display_type dtypx = DT_MAILUSER; // Default to DT_MAILUSER
 
         // Parse the display type from the property value
-        dtypx = static_cast<enum display_type>(strtoul(reinterpret_cast<const char*>(*displayType), nullptr, 0));
+        dtypx = static_cast<enum display_type>(strtoul(reinterpret_cast<const char*>(*display), nullptr, 0));
         
         if (dtypx == DT_ROOM) {
 			mlog(LV_ERR, "W-PREC: this is a room mailbox %s", par.cur.dir.c_str());
