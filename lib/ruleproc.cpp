@@ -877,7 +877,7 @@ static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipm
     if (display1 == nullptr) {
         par.ctnt->proplist.set(PR_DISPLAY_TYPE, &mailuser);
     } else {
-        mlog(LV_ERR, "W-PREC: entering else display %u", *display);
+        mlog(LV_ERR, "W-PREC: entering else display %u", *display1);
         if (*display1 == room) {
             mlog(LV_ERR, "W-PREC: this is a room mailbox %s", par.cur.dir.c_str());
             *isRoomMailbox = true;
