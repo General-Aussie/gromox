@@ -860,11 +860,11 @@ static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipm
 	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str());
     
 	auto display = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE_EX);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", display);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", *display);
 	auto display1 = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %u", display1);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %u", *display1);
     auto displayType = props.get<const uint32_t>(PR_DISPLAY_TYPE);
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", displayType);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", *displayType);
 
 	auto mailuser = DT_MAILUSER;
 	auto room = DT_ROOM;
@@ -873,11 +873,11 @@ static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipm
 	if (display1 == nullptr) {
 		par.ctnt->proplist.set<const uint32_t>(PR_DISPLAY_TYPE, &mailuser);
 	} else {
-		mlog(LV_ERR, "W-PREC: entering else display %s", display);		
-		if (display1 == DT_ROOM) {
+		mlog(LV_ERR, "W-PREC: entering else display %u", *display);		
+		if (display1 == &room) {
 			mlog(LV_ERR, "W-PREC: this is a room mailbox %s", par.cur.dir.c_str());
 			*isRoomMailbox = true;
-		} else if (display1 == DT_EQUIPMENT) {
+		} else if (display1 == &equipment) {
 			mlog(LV_ERR, "W-PREC: this is an equipment mailbox %s", par.cur.dir.c_str());
 			*isEquipmentMailbox = true;
 		}
