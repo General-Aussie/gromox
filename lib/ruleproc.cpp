@@ -846,6 +846,42 @@ static int get_policy_from_message_content(rxparam par)
     return flags;
 }
 
+static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipmentMailbox, bool *isRoomMailbox)
+{
+	mlog(LV_ERR, "W-PREC: entering rx resurse type %s", par.cur.dir.c_str());
+    static constexpr uint32_t tags[] = {PR_DISPLAY_TYPE_EX};
+    static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
+    TPROPVAL_ARRAY props{};
+
+    if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &props)) {
+		mlog(LV_ERR, "W-PREC: cannot get store properties for display type %s", par.cur.dir.c_str());
+        return ecError;
+	}
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str());
+    
+	auto display = par.ctnt->proplist.get<uint8_t>(PR_DISPLAY_TYPE_EX);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", display);
+    auto displayType = props.get<uint8_t>(PR_DISPLAY_TYPE_EX);
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", displayType);
+
+    if (displayType != nullptr) {
+        enum display_type dtypx = DT_MAILUSER; // Default to DT_MAILUSER
+
+        // Parse the display type from the property value
+        dtypx = static_cast<enum display_type>(strtoul(reinterpret_cast<const char*>(*displayType), nullptr, 0));
+        
+        if (dtypx == DT_ROOM) {
+			mlog(LV_ERR, "W-PREC: this is a room mailbox %s", par.cur.dir.c_str());
+            *isRoomMailbox = true;
+        } else if (dtypx == DT_EQUIPMENT) {
+			mlog(LV_ERR, "W-PREC: this is an equipment mailbox %s", par.cur.dir.c_str());
+            *isEquipmentMailbox = true;
+        }
+    }
+	mlog(LV_ERR, "W-PREC: resource type checked succesful %s", par.cur.dir.c_str());
+    return ecSuccess;
+}
+
 static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy) {
 	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
 	TARRAY_SET *prcpts;
@@ -1070,6 +1106,11 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	int policy = get_policy_from_message_content(par);
 	mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
 
+	bool isEquipmentMailbox = false;
+	bool isRoomMailbox = false;
+	if(!rx_resource_type(dir, par, isEquipmentMailbox, isRoomMailbox))
+		mlog(LV_DEBUG, "W-1554: cannot check resource type %s", par.cur.dir.c_str());
+
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
 	err = process_meeting_requests(par, dir, policy);
@@ -1085,20 +1126,23 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)
 			return err;
-		// if (par.del)
-		// 	break;
+		if (par.del)
+			break;
 	}
-	// if (par.del) {
-	// 	const EID_ARRAY ids = {1, reinterpret_cast<uint64_t *>(&par.cur.mid)};
-	// 	BOOL partial;
-	// 	if (!exmdb_client::delete_messages(par.cur.dir.c_str(), 0,
-	// 	    CP_ACP, nullptr, par.cur.fid, &ids, true/*hard*/, &partial))
-	// 		mlog(LV_DEBUG, "ruleproc: deletion unsuccessful");
-	// 	return ecSuccess;
-	// }
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
+	if (par.del) {
+		const EID_ARRAY ids = {1, reinterpret_cast<uint64_t *>(&par.cur.mid)};
+		BOOL partial;
+		if (!exmdb_client::delete_messages(par.cur.dir.c_str(), 0,
+		    CP_ACP, nullptr, par.cur.fid, &ids, true/*hard*/, &partial))
+			mlog(LV_DEBUG, "ruleproc: deletion unsuccessful");
+		return ecSuccess;
+	}
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	if (!exmdb_client::notify_new_mail(par.cur.dir.c_str(),
 	    par.cur.fid, par.cur.mid))
 		mlog(LV_ERR, "ruleproc: newmail notification unsuccessful");
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	return ecSuccess;
 } catch (const std::bad_alloc &) {
 	mlog(LV_ERR, "E-1121: ENOMEM");
