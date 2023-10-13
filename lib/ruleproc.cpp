@@ -861,7 +861,7 @@ static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipm
 
     mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str());
 
-	if (!par.ctnt->proplist.get<uint32_t>(PR_DISPLAY_TYPE)){
+	if (!par.ctnt->proplist.get<uint8_t>(PR_DISPLAY_TYPE)){
 		mlog(LV_ERR, "W-PREC: cannot get display type ex %s", par.cur.dir.c_str());
 		return ecError;
 	}
@@ -887,6 +887,7 @@ static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipm
         }
     }
 
+	mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %s", display1);
     mlog(LV_ERR, "W-PREC: resource type checked successfully %s", par.cur.dir.c_str());
     return ecSuccess;
 }
