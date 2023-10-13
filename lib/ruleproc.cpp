@@ -1108,7 +1108,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 
 	bool isEquipmentMailbox = false;
 	bool isRoomMailbox = false;
-	if(!rx_resource_type(dir, par, isEquipmentMailbox, isRoomMailbox))
+	if(!rx_resource_type(dir, par, &isEquipmentMailbox, &isRoomMailbox))
 		mlog(LV_DEBUG, "W-1554: cannot check resource type %s", par.cur.dir.c_str());
 
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
