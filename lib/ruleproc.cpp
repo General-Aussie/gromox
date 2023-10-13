@@ -859,7 +859,7 @@ static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipm
         return ecError;
     }
 
-    mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str());
+    mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str()); 
 
     auto display1 = par.ctnt->proplist.get<uint8_t>(PR_DISPLAY_TYPE);
     mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %s", display1);
