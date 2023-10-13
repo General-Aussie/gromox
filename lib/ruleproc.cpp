@@ -861,8 +861,10 @@ static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipm
 
     mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str());
 
-    auto display = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE_EX);
-    mlog(LV_ERR, "W-PREC: successfully store properties for display type %u", *display);
+	if (!par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE_EX)){
+		mlog(LV_ERR, "W-PREC: cannot get display type ex %s", par.cur.dir.c_str());
+		return ecError;
+	}
     auto display1 = par.ctnt->proplist.get<const uint32_t>(PR_DISPLAY_TYPE);
     mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %u", *display1);
     auto displayType = props.get<const uint32_t>(PR_DISPLAY_TYPE);
