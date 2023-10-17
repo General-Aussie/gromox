@@ -985,8 +985,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
-	bool isRoomMailbox = true; 
-	bool isEquipmentMailbox = true;
+
+	bool isEquipmentMailbox = false;
+	bool isRoomMailbox = false;
+	if(!rx_resource_type(par, &isEquipmentMailbox, &isRoomMailbox))
+		mlog(LV_DEBUG, "W-1554: cannot check resource type %s", par.cur.dir.c_str());
 
     if (isRoomMailbox || isEquipmentMailbox) {
 		mlog(LV_ERR, "W-PREC: entering if statement %s", par.cur.dir.c_str());
@@ -1101,11 +1104,6 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 
 	int policy = get_policy_from_message_content(par);
 	mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
-
-	bool isEquipmentMailbox = false;
-	bool isRoomMailbox = false;
-	if(!rx_resource_type(par, &isEquipmentMailbox, &isRoomMailbox))
-		mlog(LV_DEBUG, "W-1554: cannot check resource type %s", par.cur.dir.c_str());
 
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());

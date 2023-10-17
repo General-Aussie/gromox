@@ -3965,25 +3965,26 @@ BOOL exmdb_server::rule_new_message(const char *dir, const char *username,
  * Compares the meeting request indicated by @appt_mid whether it conflicts with any existing appointments in @fid.
  * @out_status will be filled with value 1 if there is a timeslot conflict between any appointment and the new meeting request.
  */
-BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t start_time, uint64_t end_time, uint32_t *out_status)
+BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, time_t start_time, time_t end_time, uint32_t *out_status)
 {
     // Assume no conflict initially
     *out_status = 0;
 
     // Retrieve free/busy events within the specified time range
     std::vector<freebusy_event> freebusyData;
-	mlog(LV_ERR, "W-PREC: create frreebusy struct %s", dir);
-    if (!get_freebusy(username, dir, start_time, end_time, freebusyData)){
-        mlog(LV_ERR, "W-PREC: cannot get freebusy %s", dir);
-		return FALSE;
-	}
-	mlog(LV_ERR, "W-PREC: gotten freebusy done %s", dir);
+
+    if (!get_freebusy(dir, username, start_time, end_time, freebusyData))
+    {
+		mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
+        return FALSE; // An error occurred while retrieving free/busy data.
+    }
+	mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
+
     // Iterate through free/busy events and check for conflicts
     for (const freebusy_event &event : freebusyData)
     {
-		mlog(LV_ERR, "W-PREC: check conflict %s", dir);
-        uint64_t event_start_time = rop_util_unix_to_nttime(event.start_time);
-        uint64_t event_end_time = rop_util_unix_to_nttime(event.end_time);
+        time_t event_start_time = event.start_time;
+        time_t event_end_time = event.end_time;
 
         bool is_recurring = event.details && event.details->is_recurring;
 
@@ -3995,11 +3996,13 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
             (!is_recurring && event_start_time <= end_time))
         {
             // Conflict found, set the status and return
+			mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
             *out_status = 1;
             return TRUE;
         }
     }
-	mlog(LV_ERR, "W-PREC: no conflict found %s", dir);
+
     // No conflicts found
-    return TRUE;
+	mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
+    return FALSE;
 }
