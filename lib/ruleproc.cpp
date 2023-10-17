@@ -965,14 +965,23 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: cannot get names propids %s", par.cur.dir.c_str());
 		return ecError;
 	}
+	uint32_t out_status = 0;
 	mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
+	if (par.ctnt->proplist.has<const uint64_t>(PR_START_DATE) && par.ctnt->proplist.get<const uint64_t>(PR_END_DATE)){
+		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
+		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
+		mlog(LV_ERR, "Start date: %lu", *start);
+		mlog(LV_ERR, "End date: %lu", *end);
+		auto start_whole = rop_util_nttime_to_unix(*start);
+		auto end_whole = rop_util_nttime_to_unix(*end);
 		
-	auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
-	auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
-	mlog(LV_ERR, "Start date: %lu", *start);
-	mlog(LV_ERR, "End date: %lu", *end);
-	auto start_whole = rop_util_nttime_to_unix(*start);
-	auto end_whole = rop_util_nttime_to_unix(*end);
+		if (!exmdb_client::appt_meetreq_overlap(dir, pdisplay_name, start_whole, end_whole, &out_status)){
+			snprintf(buffer, sizeof(buffer), "Meeting overlap error");
+			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
+			return ecError;
+		}
+	}	
+	
     auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
 
 	auto use_name = props.get<char>(PR_DISPLAY_NAME);
@@ -986,13 +995,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
     // static const PROPERTY_NAME ResponseStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus};
     // const char* username = itemProps.get<char>(user_name_tag);
-	uint32_t out_status = 0;
+	
 
-    if (!exmdb_client::appt_meetreq_overlap(dir, pdisplay_name, start_whole, end_whole, &out_status)){
-		snprintf(buffer, sizeof(buffer), "Meeting overlap error");
-		mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
-        return ecError;
-	}
+
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
 	bool isRoomMailbox = true; 
@@ -1078,7 +1083,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+			nullptr, CP_ACP, par.cur.mid, &props, &problems))
 			return ecRpcFailed;
 	}
 	mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
@@ -1135,6 +1140,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 		if (par.del)
 			break;
 	}
+	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	if (par.del) {
 		const EID_ARRAY ids = {1, reinterpret_cast<uint64_t *>(&par.cur.mid)};
@@ -1144,10 +1150,12 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 			mlog(LV_DEBUG, "ruleproc: deletion unsuccessful");
 		return ecSuccess;
 	}
+	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	if (!exmdb_client::notify_new_mail(par.cur.dir.c_str(),
 	    par.cur.fid, par.cur.mid))
 		mlog(LV_ERR, "ruleproc: newmail notification unsuccessful");
+	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	return ecSuccess;
 } catch (const std::bad_alloc &) {
