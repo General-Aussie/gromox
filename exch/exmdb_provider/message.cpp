@@ -3972,8 +3972,8 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
 
     // Retrieve free/busy events within the specified time range
     std::vector<freebusy_event> freebusyData;
-	auto start = rop_util_nttime_to_unix(*start_time);
-	auto end = rop_util_nttime_to_unix(*end_time);
+	auto start = rop_util_nttime_to_unix(start_time);
+	auto end = rop_util_nttime_to_unix(end_time);
 
     if (!get_freebusy(dir, username, start, end, freebusyData))
     {
