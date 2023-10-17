@@ -855,8 +855,8 @@ struct exreq_autoreply_tsupdate : public exreq {
 
 struct exreq_appt_meetreq_overlap : public exreq {
 	char *username;
-	uint64_t start_time = 0; 
-	uint64_t end_time = 0;
+	time_t start_time = 0; 
+	time_t end_time = 0;
 };
 
 struct exreq_recalc_store_size : public exreq {
