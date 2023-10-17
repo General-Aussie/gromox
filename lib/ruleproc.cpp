@@ -846,44 +846,29 @@ static int get_policy_from_message_content(rxparam par)
     return flags;
 }
 
-static ec_error_t rx_resource_type(const char *dir, rxparam &par, bool *isEquipmentMailbox, bool *isRoomMailbox)
+static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *isRoomMailbox)
 {
     mlog(LV_ERR, "W-PREC: entering rx resource type %s", par.cur.dir.c_str());
+    auto pmsg = par.ctnt;
 
-    static constexpr uint32_t tags[] = {PR_DISPLAY_TYPE_EX, PR_DISPLAY_TYPE};
-    static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
-    TPROPVAL_ARRAY props{};
-
-    if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &props)) {
-        mlog(LV_ERR, "W-PREC: cannot get store properties for display type %s", par.cur.dir.c_str());
-        return ecError;
-    }
-
-    mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", par.cur.dir.c_str()); 
-
-    auto display1 = par.ctnt->proplist.get<uint8_t>(PR_DISPLAY_TYPE);
-    mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %s", display1);
-    auto displayType = props.get<uint8_t>(PR_DISPLAY_TYPE);
-    mlog(LV_ERR, "W-PREC: successfully store properties for display type %s", displayType);
-
-    auto mailuser = DT_MAILUSER;
-    auto room = DT_ROOM;
-    auto equipment = DT_EQUIPMENT;
-
-    if (display1 == nullptr) {
-        par.ctnt->proplist.set(PR_DISPLAY_TYPE, &mailuser);
-    } else {
-        mlog(LV_ERR, "W-PREC: entering else display %s", display1);
-        if (*display1 == room) {
-            mlog(LV_ERR, "W-PREC: this is a room mailbox %s", par.cur.dir.c_str());
-            *isRoomMailbox = true;
-        } else if (*display1 == equipment) {
-            mlog(LV_ERR, "W-PREC: this is an equipment mailbox %s", par.cur.dir.c_str());
-            *isEquipmentMailbox = true;
+    if (pmsg->children.prcpts != nullptr) {
+        mlog(LV_ERR, "W-PREC: recipients is not null %s", par.cur.dir.c_str());
+        for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
+            mlog(LV_ERR, "W-PREC: recipient count is: %d", par.ctnt->children.prcpts->count); 
+            auto addrtype =  pmsg->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
+            if (addrtype != nullptr) {
+                mlog(LV_ERR, "W-PREC: successfully got address type %s", par.cur.dir.c_str()); 
+                auto disptype = pmsg->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
+                if (disptype == DT_ROOM) {
+                    *isRoomMailbox = true;
+                } else if (disptype == DT_EQUIPMENT) {
+                    *isEquipmentMailbox = true;
+                }
+            }
         }
     }
-
-	mlog(LV_ERR, "W-PREC: successfully store properties for display type without EX %s", display1);
+    mlog(LV_ERR, "W-PREC: equipment mailbox is: %d", *isEquipmentMailbox);
+    mlog(LV_ERR, "W-PREC: room mailbox is: %d", *isRoomMailbox);
     mlog(LV_ERR, "W-PREC: resource type checked successfully %s", par.cur.dir.c_str());
     return ecSuccess;
 }
@@ -1119,7 +1104,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 
 	bool isEquipmentMailbox = false;
 	bool isRoomMailbox = false;
-	if(!rx_resource_type(dir, par, &isEquipmentMailbox, &isRoomMailbox))
+	if(!rx_resource_type(par, &isEquipmentMailbox, &isRoomMailbox))
 		mlog(LV_DEBUG, "W-1554: cannot check resource type %s", par.cur.dir.c_str());
 
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
