@@ -859,9 +859,9 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
             if (addrtype != nullptr) {
                 mlog(LV_ERR, "W-PREC: successfully got address type %s", par.cur.dir.c_str()); 
                 auto disptype = pmsg->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
-                if (static_cast<display_type>(disptype) == DT_ROOM) {
+				if (*disptype == static_cast<unsigned int>(DT_ROOM)) {
 					*isRoomMailbox = true;
-				} else if (static_cast<display_type>(disptype) == DT_EQUIPMENT) {
+				} else if (*disptype == static_cast<unsigned int>(DT_EQUIPMENT)) {
 					*isEquipmentMailbox = true;
 				}
             }
