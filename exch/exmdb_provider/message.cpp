@@ -3991,11 +3991,11 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
         bool is_recurring = event.details && event.details->is_recurring;
 
         // Check for overlap with existing appointments
-        if ((event_start_time >= start_time && event_start_time <= end_time) ||
-            (event_end_time >= start_time && event_end_time <= end_time) ||
-            (event_start_time < start_time && event_end_time > end_time) ||
-            (is_recurring && event_end_time >= start_time) ||
-            (!is_recurring && event_start_time <= end_time))
+        if ((event_start_time >= start && event_start_time <= end) ||
+            (event_end_time >= start && event_end_time <= end) ||
+            (event_start_time < start && event_end_time > end) ||
+            (is_recurring && event_end_time >= start) ||
+            (!is_recurring && event_start_time <= end))
         {
             // Conflict found, set the status and return
 			mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
