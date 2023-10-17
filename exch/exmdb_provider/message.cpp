@@ -3972,10 +3972,10 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
 
     // Retrieve free/busy events within the specified time range
     std::vector<freebusy_event> freebusyData;
-	auto start_time = rop_util_nttime_to_unix(*start_time);
-	auto end_time = rop_util_nttime_to_unix(*end_time);
+	auto start = rop_util_nttime_to_unix(*start_time);
+	auto end = rop_util_nttime_to_unix(*end_time);
 
-    if (!get_freebusy(dir, username, start_time, end_time, freebusyData))
+    if (!get_freebusy(dir, username, start, end, freebusyData))
     {
 		mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
         return FALSE; // An error occurred while retrieving free/busy data.
