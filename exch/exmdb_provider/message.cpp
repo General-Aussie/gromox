@@ -3972,24 +3972,22 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
 
     // Retrieve free/busy events within the specified time range
     std::vector<freebusy_event> freebusyData;
-	auto start_time = rop_util_nttime_to_unix(*start_time);
-	auto end_time = rop_util_nttime_to_unix(*end_time);
 
-	mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %d", start_time);
-	mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %d", end_time);
+    mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %" PRIu64, start_time);
+    mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %" PRIu64, end_time);
 
     if (!get_freebusy(dir, username, start_time, end_time, freebusyData))
     {
-		mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
+        mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
         return FALSE; // An error occurred while retrieving free/busy data.
     }
-	mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
+    mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
 
     // Iterate through free/busy events and check for conflicts
     for (const freebusy_event &event : freebusyData)
     {
-        time_t event_start_time = event.start_time;
-        time_t event_end_time = event.end_time;
+        uint64_t event_start_time = event.start_time;
+        uint64_t event_end_time = event.end_time;
 
         bool is_recurring = event.details && event.details->is_recurring;
 
@@ -4001,13 +3999,13 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
             (!is_recurring && event_start_time <= end_time))
         {
             // Conflict found, set the status and return
-			mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
+            mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
             *out_status = 1;
             return TRUE;
         }
     }
 
     // No conflicts found
-	mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
+    mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
     return FALSE;
 }

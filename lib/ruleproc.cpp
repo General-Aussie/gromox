@@ -953,8 +953,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	uint32_t out_status = 0;
 	mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
 	if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
-		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
-		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
+		uint64_t start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
+		uint64_t end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
 		mlog(LV_ERR, "Start date: %lu", *start);
 		mlog(LV_ERR, "End date: %lu", *end);
 		// auto start_whole = rop_util_nttime_to_unix(*start);
