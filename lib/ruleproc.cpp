@@ -957,10 +957,12 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
 		mlog(LV_ERR, "Start date: %lu", *start);
 		mlog(LV_ERR, "End date: %lu", *end);
-		// auto start_whole = rop_util_nttime_to_unix(*start);
-		// auto end_whole = rop_util_nttime_to_unix(*end);
+		auto start_whole = rop_util_nttime_to_unix(*start);
+		auto end_whole = rop_util_nttime_to_unix(*end);
+		auto startt = rop_util_unix_to_nttime(start_whole);
+		auto endd = rop_util_unix_to_nttime(end_whole);
 		
-		if (!exmdb_client::appt_meetreq_overlap(dir, pdisplay_name, start, end, &out_status)){
+		if (!exmdb_client::appt_meetreq_overlap(dir, pdisplay_name, startt, endd, &out_status)){
 			snprintf(buffer, sizeof(buffer), "Meeting overlap error");
 			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 			return ecError;
