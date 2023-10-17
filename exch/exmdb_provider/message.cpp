@@ -3965,13 +3965,18 @@ BOOL exmdb_server::rule_new_message(const char *dir, const char *username,
  * Compares the meeting request indicated by @appt_mid whether it conflicts with any existing appointments in @fid.
  * @out_status will be filled with value 1 if there is a timeslot conflict between any appointment and the new meeting request.
  */
-BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, time_t start_time, time_t end_time, uint32_t *out_status)
+BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t start_time, uint64_t end_time, uint32_t *out_status)
 {
     // Assume no conflict initially
     *out_status = 0;
 
     // Retrieve free/busy events within the specified time range
     std::vector<freebusy_event> freebusyData;
+	auto start_time = rop_util_nttime_to_unix(*start_time);
+	auto end_time = rop_util_nttime_to_unix(*end_time);
+
+	mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %d", start_time);
+	mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %d", end_time);
 
     if (!get_freebusy(dir, username, start_time, end_time, freebusyData))
     {
