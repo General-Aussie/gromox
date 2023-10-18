@@ -982,7 +982,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto response_requested = par.ctnt->proplist.get<const uint8_t>(PR_RESPONSE_REQUESTED);
 	mlog(LV_ERR, "W-PREC: Checking for if response is requested %d", response_requested);
 	if(response_requested){
-		meetingresponse = true;
+		*meetingresponse = true;
 	}
 	
     auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
