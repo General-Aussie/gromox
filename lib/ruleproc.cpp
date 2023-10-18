@@ -873,7 +873,7 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
     return ecSuccess;
 }
 
-static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy) {
+static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy, bool *meetingresponse) {
 	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
 	TARRAY_SET *prcpts;
 	const uint8_t responseDeclined = olResponseDeclined;
@@ -882,6 +882,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
     std::vector<freebusy_event> intersect;
 	char buffer[100];
 
+	auto msg = message_content_init();	
 	auto pmsg = par.ctnt; 
 	mlog(LV_ERR, "W-PREC: setting pmsg to par.ctnt %s", par.cur.dir.c_str());
 	if (pmsg == nullptr)
@@ -950,6 +951,17 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: cannot get names propids %s", par.cur.dir.c_str());
 		return ecError;
 	}
+	auto use_name = props.get<char>(PR_DISPLAY_NAME);
+	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME using props: %s", use_name);
+	if (!par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1])))
+		mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", use_name);
+	if (!msg->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1])))
+		mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", use_name);
+	auto cur_resp = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1]));
+	mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", cur_resp);
+
+
+
 	uint32_t out_status = 0;
 	mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
 	if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
@@ -962,17 +974,19 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto startt = rop_util_unix_to_nttime(start_whole);
 		auto endd = rop_util_unix_to_nttime(end_whole);
 		
-		if (!exmdb_client::appt_meetreq_overlap(dir, pdisplay_name, startt, endd, &out_status)){
+		if (!exmdb_client::appt_meetreq_overlap(dir, use_name, startt, endd, &out_status)){
 			snprintf(buffer, sizeof(buffer), "Meeting overlap error");
 			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
-			return ecError;
 		}
-	}	
+	}
+	auto response_requested = par.ctnt->proplist.get<const uint8_t>(PR_RESPONSE_REQUESTED);
+	mlog(LV_ERR, "W-PREC: Checking for if response is requested %d", response_requested);
+	if(response_requested){
+		meetingresponse = true;
+	}
 	
     auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
 
-	auto use_name = props.get<char>(PR_DISPLAY_NAME);
-	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME using props: %s", use_name);
 	auto propmessage_class = props.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS with prop: %s", propmessage_class);
 
@@ -1109,7 +1123,8 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
-	err = process_meeting_requests(par, dir, policy);
+	bool meetingresponse = false;
+	err = process_meeting_requests(par, dir, policy, &meetingresponse);
 	if (err != ecSuccess){
 		return err;
 		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
