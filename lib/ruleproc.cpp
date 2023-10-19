@@ -878,6 +878,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	TARRAY_SET *prcpts;
 	const uint8_t responseDeclined = olResponseDeclined;
 	const uint8_t responseAccepted = olResponseAccepted;
+	const uint8_t notresponded = olResponseNotResponded;
 	const uint8_t busy = olBusy;
     std::vector<freebusy_event> intersect;
 	char buffer[100];
@@ -997,10 +998,15 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
 
 	for (size_t i = 0; i < rows.count; ++i) {
-		auto ts = rows.pparray[i]->get<const uint32_t>(response_stat);
+		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
 			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: cannot query table: %u", response_stat);	
+		mlog(LV_ERR, "W-PREC: got response status: %s", response_stat);	
+		if (response_stat == notresponded){
+			mlog(LV_ERR, "W-PREC: not responded: %s", par.cur.dir.c_str());
+		} else {
+			mlog(LV_ERR, "W-PREC: got response status: %s", response_stat);
+		}
 	
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
