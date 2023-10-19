@@ -23,7 +23,7 @@
 #include <gromox/rop_util.hpp>
 #include <gromox/scope.hpp>
 #include <gromox/util.hpp>
-#include "namedtags.hpp"
+#include <gromox/exch/ews/namedtags.hpp>
 
 // Extended MAPI Definitions
 #define POLICY_PROCESS_MEETING_REQUESTS              0x0001
@@ -1026,8 +1026,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
     // static const PROPERTY_NAME ResponseStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus};
     // const char* username = itemProps.get<char>(user_name_tag);
-	
-
 
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
