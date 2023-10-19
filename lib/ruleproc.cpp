@@ -876,9 +876,9 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
 static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy, bool *meetingresponse) {
 	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
 	TARRAY_SET *prcpts;
-	const uint8_t responseDeclined = olResponseDeclined;
-	const uint8_t responseAccepted = olResponseAccepted;
-	const uint8_t notresponded = olResponseNotResponded;
+	const uint32_t responseDeclined = olResponseDeclined;
+	const uint32_t responseAccepted = olResponseAccepted;
+	const uint32_t notresponded = olResponseNotResponded;
 	const uint8_t busy = olBusy;
     std::vector<freebusy_event> intersect;
 	char buffer[100];
@@ -1001,15 +1001,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
 			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: got response status: %u", response_stat);	
-		if (response_stat == notresponded){
+		mlog(LV_ERR, "W-PREC: got response status: %u", ts);	
+		if (ts == notresponded){
 			mlog(LV_ERR, "W-PREC: not responded: %s", par.cur.dir.c_str());
 		} else {
-			mlog(LV_ERR, "W-PREC: got response status: %u", response_stat);
+			mlog(LV_ERR, "W-PREC: got response status: %u", ts);
 		}
 
-		// if(!rows.pparray[i]->set(response_stat, &olResponseAccepted) != 0)
-		if (!rows.pparray[i]->set(response_stat, &olResponseAccepted))
+		if(!rows.pparray[i]->set(response_stat, &responseAccepted) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
 		mlog(LV_ERR, "W-PREC: set response status to accepted: %u", response_stat);
 	
