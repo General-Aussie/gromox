@@ -942,6 +942,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		{MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus},
 		{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
 		{MNID_ID, PSETID_MEETING,     PidLidGlobalObjectId},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
+		{MNID_ID, PSETID_COMMON, PidLidCommonStart},
+		{MNID_ID, PSETID_COMMON, PidLidCommonEnd},
+
 	};
 
 	mlog(LV_ERR, "W-PREC: load propnames %s", par.cur.dir.c_str());
@@ -953,12 +957,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		return ecError;
 	}
 
-	auto goid = PROP_TAG(PT_LONG, propids.ppropid[3]);
 	PROPERTY_NAME GlobalObjectId = {MNID_ID, PSETID_MEETING, PidLidGlobalObjectId};
-	PROPERTY_NAME NtBusyStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus};
-	PROPERTY_NAME NtCommonEnd = {MNID_ID, PSETID_COMMON, PidLidCommonEnd};
-	PROPERTY_NAME NtCommonStart = {MNID_ID, PSETID_COMMON, PidLidCommonStart};
-	PROPERTY_NAME NtResponseStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus};
+
+	auto goid = PROP_TAG(PT_BINARY, propids.ppropid[3]);
+	auto response_stat = PROP_TAG(PT_LONG, propids.ppropid[1]);
+	auto busy_stat = PROP_TAG(PT_LONG, propids.ppropid[2]);
 
 	RESTRICTION_EXIST rst_1 = {GlobalObjectId.lid};
 	RESTRICTION_PROPERTY prop_goid = {RELOP_EQ, GlobalObjectId.lid, {GlobalObjectId.lid, (&goid)}};
@@ -972,7 +975,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
 
 	uint32_t proptag_buff[] = {
-		NtResponseStatus, NtBusyStatus, NtCommonEnd, NtCommonStart,
+		response_stat, busy_stat,
 	};
 	const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 	TARRAY_SET rows;
