@@ -965,11 +965,13 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 	RESTRICTION_EXIST rst_1 = {GlobalObjectId.lid};
 	RESTRICTION_PROPERTY prop_goid = {RELOP_EQ, GlobalObjectId.lid, {GlobalObjectId.lid, (&goid)}};
-	RESTRICTION goid_restriction[2] = {{RES_EXIST, {&rst_1}}, {RES_PROPERTY, {&prop_goid}}};
+	RESTRICTION rst_2[2] = {{RES_EXIST, {&rst_1}}, {RES_PROPERTY, {&prop_goid}}};
+	RESTRICTION_AND_OR rst_3 = {std::size(rst_2), rst_2};
+
 	mlog(LV_ERR, "W-PREC: creating the filter: %s", par.cur.dir.c_str());
 
 	uint32_t table_id = 0, row_count = 0;
-	if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &goid_restriction, nullptr, &table_id, &row_count))
+	if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_3, nullptr, &table_id, &row_count))
 		mlog(LV_ERR, "W-PREC: cannot load table content: %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: returned number of rows is: %d", row_count);
 	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
