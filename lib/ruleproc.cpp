@@ -1026,7 +1026,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		propvals.ppropval = tmp_propvals;
 
 		tmp_propvals[0].proptag = PidLidResponseStatus;
-		tmp_propvals[0].pvalue = &responseAccepted;
+		tmp_propvals[0].pvalue = deconst(&responseAccepted);
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 	    	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
