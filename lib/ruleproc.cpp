@@ -23,7 +23,6 @@
 #include <gromox/rop_util.hpp>
 #include <gromox/scope.hpp>
 #include <gromox/util.hpp>
-#include <gromox/namedtags.hpp>
 
 // Extended MAPI Definitions
 #define POLICY_PROCESS_MEETING_REQUESTS              0x0001
