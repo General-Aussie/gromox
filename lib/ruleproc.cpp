@@ -1001,11 +1001,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
 			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: got response status: %s", response_stat);	
+		mlog(LV_ERR, "W-PREC: got response status: %d", response_stat);	
 		if (response_stat == notresponded){
 			mlog(LV_ERR, "W-PREC: not responded: %s", par.cur.dir.c_str());
 		} else {
-			mlog(LV_ERR, "W-PREC: got response status: %s", response_stat);
+			mlog(LV_ERR, "W-PREC: got response status: %d", response_stat);
 		}
 	
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
