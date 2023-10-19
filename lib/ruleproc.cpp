@@ -1019,14 +1019,19 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 		mlog(LV_ERR, "W-PREC: final check for ts: %u", *ts);
 
-		TAGGED_PROPVAL tmp_propvals[1];
+		TAGGED_PROPVAL tmp_propvals[3];
 		TPROPVAL_ARRAY propvals;
 
-		propvals.count = 1;
+		propvals.count = 3;
 		propvals.ppropval = tmp_propvals;
 
-		tmp_propvals[0].proptag = PidLidResponseStatus;
+		tmp_propvals[0].proptag = proptag_buff[0];
 		tmp_propvals[0].pvalue = deconst(&responseAccepted);
+		auto nt_time = rop_util_current_nttime();
+		tmp_propvals[1].proptag = PR_LOCAL_COMMIT_TIME_MAX;
+		tmp_propvals[1].pvalue = &nt_time;
+		tmp_propvals[2].proptag = PR_LAST_MODIFICATION_TIME;
+		tmp_propvals[2].pvalue = &nt_time;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 	    	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
