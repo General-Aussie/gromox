@@ -1008,7 +1008,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			mlog(LV_ERR, "W-PREC: got response status: %u", response_stat);
 		}
 
-		if(!rows.pparray[i]->set(response_stat, olResponseAccepted) != 0)
+		if(!rows.pparray[i]->set(response_stat, &olResponseAccepted) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
 
 		mlog(LV_ERR, "W-PREC: set response status to accepted: %u", response_stat);
