@@ -997,6 +997,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
 
 	for (size_t i = 0; i < rows.count; ++i) {
+		TPROPVAL_ARRAY vals2{};
+		if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), nullptr, CP_ACP,
+		    par.cur.mid, &proptags, &vals2))
+			continue;
+		auto ts_prop = vals2.get<const uint8_t>(response_stat);
+		if (ts_prop == nullptr)
+			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: got response status (initial check): %u", *ts_prop);	
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
 			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
@@ -1018,6 +1026,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 		mlog(LV_ERR, "W-PREC: final check for ts: %u", *ts);
+
+		if(!par.ctnt->save())
+			mlog(LV_ERR, "W-PREC: cannot save message properties using the save(): %u", par.cur.dir.c_str());
 
 		TAGGED_PROPVAL tmp_propvals[3];
 		TPROPVAL_ARRAY propvals;
