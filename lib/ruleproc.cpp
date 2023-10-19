@@ -23,6 +23,7 @@
 #include <gromox/rop_util.hpp>
 #include <gromox/scope.hpp>
 #include <gromox/util.hpp>
+#include "namedtags.hpp"
 
 // Extended MAPI Definitions
 #define POLICY_PROCESS_MEETING_REQUESTS              0x0001
@@ -941,6 +942,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		{MNID_ID, PSETID_APPOINTMENT, PidLidRecurring},
 		{MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus},
 		{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
+		{MNID_ID, PSETID_MEETING,     PidLidGlobalObjectId},
 	};
 
 	mlog(LV_ERR, "W-PREC: load propnames %s", par.cur.dir.c_str());
@@ -951,6 +953,34 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: cannot get names propids %s", par.cur.dir.c_str());
 		return ecError;
 	}
+
+	auto goid = PROP_TAG(PT_LONG, propids.ppropid[3]);
+	static const PROPERTY_NAME GlobalObjectId = {MNID_ID, PSETID_MEETING, PidLidGlobalObjectId};
+
+	RESTRICTION_EXIST rst_1 = {GlobalObjectId};
+	RESTRICTION_PROPERTY prop_goid = {RELOP_EQ, GlobalObjectId, {GlobalObjectId, (&goid)}};
+	RESTRICTION goid_restriction[2] = {{RES_EXIST, {&rst_1}}, {RES_PROPERTY, {&prop_goid}}};
+	mlog(LV_ERR, "W-PREC: creating the filter: %s", par.cur.dir.c_str());
+
+	uint32_t table_id = 0, row_count = 0;
+	if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &goid_restriction, nullptr, &table_id, &row_count))
+		mlog(LV_ERR, "W-PREC: cannot load table content: %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: returned number of rows is: %d", row_count);
+	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
+
+	uint32_t proptag_buff[] = {
+		NtResponseStatus, NtBusyStatus, NtCommonEnd, NtCommonStart,
+	};
+	const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
+	TARRAY_SET rows;
+	if (!exmdb_client::query_table(par.cur.dir.c_str(), nullptr, CP_ACP, table_id,
+	    &proptags, 0, row_count, &rows))
+		mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
+	
+	cl_0.release();
+	if (!exmdb_client::unload_table(dir, table_id))
+		mlog(LV_ERR, "W-PREC: unload table: %s", par.cur.dir.c_str());
+
 	auto use_name = props.get<char>(PR_DISPLAY_NAME);
 	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME using props: %s", use_name);
 	if (!par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1])))
