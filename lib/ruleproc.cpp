@@ -1049,8 +1049,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME using props: %s", use_name);
 	if (!par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1])))
 		mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", use_name);
-	if (!msg->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1])))
-		mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", use_name);
 	auto cur_resp = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1]));
 	mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", cur_resp);
 
