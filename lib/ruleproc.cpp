@@ -849,16 +849,15 @@ static int get_policy_from_message_content(rxparam par)
 static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *isRoomMailbox)
 {
     mlog(LV_ERR, "W-PREC: entering rx resource type %s", par.cur.dir.c_str());
-    auto pmsg = par.ctnt;
 
-    if (pmsg->children.prcpts != nullptr) {
+    if (par.ctnt->children.prcpts != nullptr) {
         mlog(LV_ERR, "W-PREC: recipients is not null %s", par.cur.dir.c_str());
-        for (unsigned int i = 0; i < pmsg->children.prcpts->count; ++i) {
-            mlog(LV_ERR, "W-PREC: recipient count is: %d", pmsg->children.prcpts->count); 
-            auto addrtype =  pmsg->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
+        for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
+            mlog(LV_ERR, "W-PREC: recipient count is: %d", par.ctnt->children.prcpts->count); 
+            auto addrtype =  par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
             if (addrtype != nullptr) {
                 mlog(LV_ERR, "W-PREC: successfully got address type %s", par.cur.dir.c_str()); 
-                auto disptype = pmsg->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
+                auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
 				if (*disptype == static_cast<unsigned int>(DT_ROOM)) {
 					*isRoomMailbox = true;
 				} else if (*disptype == static_cast<unsigned int>(DT_EQUIPMENT)) {
@@ -1019,9 +1018,18 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 		mlog(LV_ERR, "W-PREC: final check for ts: %u", *ts);
+
+		TAGGED_PROPVAL tmp_propvals[1];
+		TPROPVAL_ARRAY propvals;
+
+		propvals.count = 1;
+		propvals.ppropval = tmp_propvals;
+
+		tmp_propvals[0].proptag = PidLidResponseStatus;
+		tmp_propvals[0].pvalue = &responseAccepted;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-	    	nullptr, CP_ACP, par.cur.mid, rows.pparray[i], &problems))
+	    	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
 			mlog(LV_ERR, "W-PREC: cannot save message properties : %u", *ts);
 		mlog(LV_ERR, "W-PREC: successfully set message property: %u", *ts);
 	}
