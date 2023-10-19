@@ -1011,6 +1011,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if(rows.pparray[i]->set(response_stat, &responseAccepted) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
 		mlog(LV_ERR, "W-PREC: set response status to accepted: %u", response_stat);
+
+		auto ts_new = rows.pparray[i]->get<const uint8_t>(response_stat);
+		mlog(LV_ERR, "W-PREC: got response status: %u", *ts_new);
 	
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
