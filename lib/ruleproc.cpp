@@ -991,14 +991,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
 
 	for (size_t i = 0; i < rows.count; ++i) {
-		TPROPVAL_ARRAY vals2{};
-		if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), nullptr, CP_ACP,
-		    par.cur.mid, &proptags, &vals2))
-			continue;
-		auto ts_prop = vals2.get<const uint8_t>(response_stat);
-		if (ts_prop == nullptr)
-			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: got response status (initial check): %u", *ts_prop);	
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
 			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
