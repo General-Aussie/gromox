@@ -882,7 +882,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
     std::vector<freebusy_event> intersect;
 	char buffer[100];
 
-	auto msg = message_content_init();	
 	auto pmsg = par.ctnt; 
 	mlog(LV_ERR, "W-PREC: setting pmsg to par.ctnt %s", par.cur.dir.c_str());
 	if (pmsg == nullptr)
@@ -907,11 +906,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	/* ignore ATTENDEE when METHOD is "PUBLIC" */
 	if (strcasecmp(pmessage_class, "IPM.Appointment") == 0)
 		return ecSuccess;
-	
-	prcpts = tarray_set_init();
-	if (prcpts == nullptr)
-		return ecError;
-	pmsg->set_rcpts_internal(prcpts);
 
 	auto pdisplay_name = par.ctnt->proplist.get<char>(PR_DISPLAY_NAME);
 	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME: %s", pdisplay_name);
@@ -1026,9 +1020,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 		mlog(LV_ERR, "W-PREC: final check for ts: %u", *ts);
-
-		if(!par.ctnt->save())
-			mlog(LV_ERR, "W-PREC: cannot save message properties using the save(): %u", par.cur.dir.c_str());
 
 		TAGGED_PROPVAL tmp_propvals[3];
 		TPROPVAL_ARRAY propvals;
