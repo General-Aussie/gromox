@@ -1001,22 +1001,24 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
 			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: got response status: %u", *ts);	
+		mlog(LV_ERR, "W-PREC: got response status (initial check): %u", *ts);	
 		if (*ts == static_cast<unsigned char>(notresponded)){
 			mlog(LV_ERR, "W-PREC: not responded: %s", par.cur.dir.c_str());
 		} else {
-			mlog(LV_ERR, "W-PREC: got response status: %u", *ts);
+			mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", *ts);
 		}
 
 		if(rows.pparray[i]->set(response_stat, &responseAccepted) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
-		mlog(LV_ERR, "W-PREC: set response status to accepted: %u", response_stat);
+		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
 
 		auto ts_new = rows.pparray[i]->get<const uint8_t>(response_stat);
-		mlog(LV_ERR, "W-PREC: got response status: %u", *ts_new);
+		mlog(LV_ERR, "W-PREC: got response status new: %u", *ts_new);
 	
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
+		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
+		mlog(LV_ERR, "W-PREC: final check for ts: %u", *ts);
 	}
 	
 	cl_0.release();
