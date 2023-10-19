@@ -853,8 +853,8 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
 
     if (pmsg->children.prcpts != nullptr) {
         mlog(LV_ERR, "W-PREC: recipients is not null %s", par.cur.dir.c_str());
-        for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
-            mlog(LV_ERR, "W-PREC: recipient count is: %d", par.ctnt->children.prcpts->count); 
+        for (unsigned int i = 0; i < pmsg->children.prcpts->count; ++i) {
+            mlog(LV_ERR, "W-PREC: recipient count is: %d", pmsg->children.prcpts->count); 
             auto addrtype =  pmsg->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
             if (addrtype != nullptr) {
                 mlog(LV_ERR, "W-PREC: successfully got address type %s", par.cur.dir.c_str()); 
@@ -994,10 +994,21 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	if (!exmdb_client::query_table(par.cur.dir.c_str(), nullptr, CP_ACP, table_id,
 	    &proptags, 0, row_count, &rows))
 		mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
+
+	for (size_t i = 0; i < rows.count; ++i) {
+		auto ts = rows.pparray[i]->get<const uint32_t>(response_stat);
+		if (ts == nullptr)
+			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: cannot query table: %u", response_stat);	
+	
+		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
+		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
+	}
 	
 	cl_0.release();
-	if (!exmdb_client::unload_table(dir, table_id))
-		mlog(LV_ERR, "W-PREC: unload table: %s", par.cur.dir.c_str());
+	if (!exmdb_client::unload_table(par.cur.dir.c_str(), table_id))
+		mlog(LV_ERR, "W-PREC: cannot unload table: %s", par.cur.dir.c_str());
 
 	auto use_name = props.get<char>(PR_DISPLAY_NAME);
 	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME using props: %s", use_name);
