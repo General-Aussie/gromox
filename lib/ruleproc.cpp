@@ -876,7 +876,6 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
 static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy, bool *meetingresponse) {
 	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
 	TARRAY_SET *prcpts;
-	PROBLEM_ARRAY problems;
 	const uint8_t responseDeclined = olResponseDeclined;
 	const uint8_t responseAccepted = olResponseAccepted;
 	const uint8_t notresponded = olResponseNotResponded;
@@ -1020,7 +1019,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 		mlog(LV_ERR, "W-PREC: final check for ts: %u", *ts);
-
+		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 	    	nullptr, CP_ACP, par.cur.mid, &proptags, &problems))
 			mlog(LV_ERR, "W-PREC: cannot save message properties : %u", *ts);
