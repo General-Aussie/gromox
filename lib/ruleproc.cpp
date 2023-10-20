@@ -1013,7 +1013,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		uint32_t instanceId;
 		if(!exmdb_client::load_message_instance(par.cur.dir.c_str(), nullptr, CP_ACP, false, par.cur.fid, par.cur.mid, &instanceId))
 			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: this is the message instance %u", *instanceId);
+		// mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
 
 		// TAGGED_PROPVAL tmp_propvals[3];
 		// TPROPVAL_ARRAY propvals;
