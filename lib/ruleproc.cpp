@@ -989,6 +989,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	    &proptags, 0, row_count, &rows))
 		mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
+	uint32_t instance_id = 0;
 
 	for (size_t i = 0; i < rows.count; ++i) {
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
@@ -1026,11 +1027,17 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		tmp_propvals[1].pvalue = &nt_time;
 		tmp_propvals[2].proptag = PR_LAST_MODIFICATION_TIME;
 		tmp_propvals[2].pvalue = &nt_time;
+		
 		PROBLEM_ARRAY problems{};
-		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-	    	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
-			mlog(LV_ERR, "W-PREC: cannot save message properties : %u", *ts);
-		mlog(LV_ERR, "W-PREC: successfully set message property: %u", *ts);
+
+		if(!exmdb_client::write_message_instance(par.cur.dir.c_str(), instance_id, par.ctnt, TRUE, proptags, problems))
+			mlog(LV_ERR, "W-PREC: cannot save message properties : %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: successfully set message property: %s", par.cur.dir.c_str());
+
+		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+	    // 	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
+		// 	mlog(LV_ERR, "W-PREC: cannot save message properties : %u", *ts);
+		// mlog(LV_ERR, "W-PREC: successfully set message property: %u", *ts);
 	}
 	
 	cl_0.release();
