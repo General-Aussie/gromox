@@ -983,7 +983,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	uint32_t proptag_buff[] = {
 		response_stat, busy_stat,
 	};
-	const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
+	PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 	TARRAY_SET rows;
 	if (!exmdb_client::query_table(par.cur.dir.c_str(), nullptr, CP_ACP, table_id,
 	    &proptags, 0, row_count, &rows))
@@ -1029,7 +1029,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 		PROBLEM_ARRAY problems{};
 
-		if(!exmdb_client::write_message_instance(par.cur.dir.c_str(), instance_id, par.ctnt, TRUE, deconst(&proptags), &problems))
+		if(!exmdb_client::write_message_instance(par.cur.dir.c_str(), instance_id, par.ctnt, TRUE, &proptags, &problems))
 			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
 
