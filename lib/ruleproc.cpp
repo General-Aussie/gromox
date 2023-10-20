@@ -1030,7 +1030,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 		PROBLEM_ARRAY problems{};
 
-		if(!exmdb_client::write_message_instance(par.cur.dir.c_str(), instance_id, par.ctnt, TRUE, &proptags, &problems))
+		if(!exmdb_client::write_message_instance(par.cur.dir.c_str(), instance_id, par.ctnt, TRUE, deconst(&proptags), &problems))
 			mlog(LV_ERR, "W-PREC: cannot save message properties : %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: successfully set message property: %s", par.cur.dir.c_str());
 
