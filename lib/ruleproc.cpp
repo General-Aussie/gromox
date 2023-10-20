@@ -1012,7 +1012,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
-		mlog(LV_ERR, "W-PREC: final check for ts: %u", *ts);
 
 		TAGGED_PROPVAL tmp_propvals[3];
 		TPROPVAL_ARRAY propvals;
@@ -1031,8 +1030,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		PROBLEM_ARRAY problems{};
 
 		if(!exmdb_client::write_message_instance(par.cur.dir.c_str(), instance_id, par.ctnt, TRUE, deconst(&proptags), &problems))
-			mlog(LV_ERR, "W-PREC: cannot save message properties : %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: successfully set message property: %s", par.cur.dir.c_str());
+			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
 
 		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 	    // 	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
