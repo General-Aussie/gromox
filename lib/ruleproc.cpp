@@ -988,8 +988,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	    &proptags, 0, row_count, &rows))
 		mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
-	uint32_t instance_id = 0;
-
 	for (size_t i = 0; i < rows.count; ++i) {
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
@@ -1012,6 +1010,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 
+		uint32_t instanceId;
+		if(!exmdb.load_message_instance(par.cur.dir.c_str(), nullptr, CP_ACP, false, par.cur.fid, par.cur.mid, &instanceId))
+			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: this is the message instance %u", &instanceId);
+
 		// TAGGED_PROPVAL tmp_propvals[3];
 		// TPROPVAL_ARRAY propvals;
 
@@ -1028,7 +1031,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 		PROBLEM_ARRAY problems{};
 
-		if(!exmdb_client::write_message_instance(dir, instance_id, par.ctnt, TRUE, &proptags, &problems))
+		if(!exmdb_client::write_message_instance(dir, instanceId, par.ctnt, TRUE, &proptags, &problems))
 			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
 
@@ -1211,24 +1214,16 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
 	bool meetingresponse = false;
-	// err = process_meeting_requests(par, dir, policy, &meetingresponse);
-	// if (err != ecSuccess){
-	// 	return err;
-	// 	mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
-	// }
+	err = process_meeting_requests(par, dir, policy, &meetingresponse);
+	if (err != ecSuccess){
+		return err;
+		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
+	}
 	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
 	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
 
 	for (auto &&rule : rule_list) {
-		err = process_meeting_requests(par, dir, policy, &meetingresponse);
-		if (err != ecSuccess){
-			return err;
-			mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
-		}
-		mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
-		auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-		mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)
 			return err;
