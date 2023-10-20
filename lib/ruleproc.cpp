@@ -1024,7 +1024,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// tmp_propvals[1].proptag = PR_LOCAL_COMMIT_TIME_MAX;
 		// tmp_propvals[1].pvalue = &nt_time;
 		// tmp_propvals[2].proptag = PR_LAST_MODIFICATION_TIME;
-		tmp_propvals[2].pvalue = &nt_time;
+		// tmp_propvals[2].pvalue = &nt_time;
 
 		PROBLEM_ARRAY problems{};
 
