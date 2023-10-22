@@ -875,10 +875,10 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
 static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy, bool *meetingresponse) {
 	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
 	TARRAY_SET *prcpts;
-	const uint64_t responseDeclined = olResponseDeclined;
-	const uint64_t responseAccepted = olResponseAccepted;
-	const uint8_t notresponded = olResponseNotResponded;
-	const uint8_t busy = olBusy;
+	uint16_t responseDeclined = olResponseDeclined;
+	uint16_t responseAccepted = olResponseAccepted;
+	uint8_t notresponded = olResponseNotResponded;
+	uint8_t busy = olBusy;
     std::vector<freebusy_event> intersect;
 	char buffer[100];
 
@@ -1000,7 +1000,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		}
 
 		mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", &responseAccepted);
-		if(rows.pparray[i]->set(response_stat, &responseAccepted) != 0)
+		if(rows.pparray[i]->set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
 		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
 
