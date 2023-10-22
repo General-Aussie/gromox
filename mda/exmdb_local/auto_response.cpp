@@ -257,7 +257,7 @@ void auto_meeting_reply(const char *user_home,
 	// uint8_t reply_state = strtol(str_value, nullptr, 0);
 	// if (reply_state != 1 && reply_state != 2)
 	// 	return;
-	// auto cur_time = time(nullptr);
+	auto cur_time = time(nullptr);
 	// if (2 == reply_state) {
 	// 	str_value = pconfig->get_value("START_TIME");
 	// 	if (str_value != nullptr && strtoll(str_value, nullptr, 0) > cur_time)
