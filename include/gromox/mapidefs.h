@@ -1414,12 +1414,12 @@ enum { /* for PidTagRecipientTrackStatus */
 };
 
 enum { /* for PidLidResponseStatus */
-	olResponseNone = 0,
-	olResponseOrganized,
-	olResponseTentative,
-	olResponseAccepted,
-	olResponseDeclined,
-	olResponseNotResponded,
+	olResponseNone         = 0x0U,
+	olResponseOrganized    = 0x1U,
+	olResponseTentative    = 0x2U,
+	olResponseAccepted     = 0x3U,
+	olResponseDeclined     = 0x4U,
+	olResponseNotResponded = 0x5U,
 };
 
 /*
