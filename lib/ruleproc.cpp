@@ -1213,12 +1213,10 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 			mlog(LV_DEBUG, "ruleproc: deletion unsuccessful");
 		return ecSuccess;
 	}
-	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	if (!exmdb_client::notify_new_mail(par.cur.dir.c_str(),
 	    par.cur.fid, par.cur.mid))
 		mlog(LV_ERR, "ruleproc: newmail notification unsuccessful");
-	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
