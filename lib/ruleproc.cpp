@@ -1233,7 +1233,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
 	}
 	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
-	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
 
 	for (auto &&rule : rule_list) {
