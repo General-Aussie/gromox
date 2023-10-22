@@ -877,7 +877,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	TARRAY_SET *prcpts;
 	uint16_t responseDeclined = olResponseDeclined;
 	uint16_t responseAccepted = olResponseAccepted;
-	uint8_t notresponded = olResponseNotResponded;
+	uint16_t notresponded = olResponseNotResponded;
 	uint8_t busy = olBusy;
     std::vector<freebusy_event> intersect;
 	char buffer[100];
@@ -1205,6 +1205,13 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	if (!exmdb_client::read_message(par.cur.dir.c_str(), nullptr, CP_ACP,
 	    par.cur.mid, &par.ctnt))
 		return ecError;
+	for (auto &&rule : rule_list) {
+		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
+		if (err != ecSuccess)
+			return err;
+		if (par.del)
+			break;
+	}
 	if (par.del) {
 		const EID_ARRAY ids = {1, reinterpret_cast<uint64_t *>(&par.cur.mid)};
 		BOOL partial;
@@ -1235,14 +1242,6 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
 	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
-
-	for (auto &&rule : rule_list) {
-		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
-		if (err != ecSuccess)
-			return err;
-		if (par.del)
-			break;
-	}
 	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	return ecSuccess;
