@@ -974,17 +974,17 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: creating the filter: %s", par.cur.dir.c_str());
 
 	uint32_t table_id = 0, row_count = 0;
-	if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_10, nullptr, &table_id, &row_count))
+	if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_10, nullptr, &table_id, &row_count))
 		mlog(LV_ERR, "W-PREC: cannot load table content: %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: returned number of rows is: %d", row_count);
-	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
+	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id); });
 
 	uint32_t proptag_buff[] = {
 		response_stat, busy_stat,
 	};
 	PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 	TARRAY_SET rows;
-	if (!exmdb_client::query_table(par.cur.dir.c_str(), nullptr, CP_ACP, table_id,
+	if (!exmdb_client::query_table(dir, nullptr, CP_ACP, table_id,
 	    &proptags, 0, row_count, &rows))
 		mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
@@ -999,7 +999,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", *ts);
 		}
 
-		mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", *responseAccepted);
+		mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", responseAccepted);
 		if(rows.pparray[i]->set(response_stat, &responseAccepted) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
 		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
@@ -1012,7 +1012,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 
 		uint32_t instanceId;
-		if(!exmdb_client::load_message_instance(par.cur.dir.c_str(), nullptr, CP_ACP, false, par.cur.fid, par.cur.mid, &instanceId))
+		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, par.cur.mid, &instanceId))
 			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
 		// mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
 
@@ -1043,7 +1043,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	}
 	
 	cl_0.release();
-	if (!exmdb_client::unload_table(par.cur.dir.c_str(), table_id))
+	if (!exmdb_client::unload_table(dir, table_id))
 		mlog(LV_ERR, "W-PREC: cannot unload table: %s", par.cur.dir.c_str());
 
 	auto use_name = props.get<char>(PR_DISPLAY_NAME);
