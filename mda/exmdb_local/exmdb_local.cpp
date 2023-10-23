@@ -441,7 +441,6 @@ int exmdb_local_deliverquota(MESSAGE_CONTEXT *pcontext, const char *address) try
 	           address, folder_id, message_id);
 	if (err != ecSuccess)
 		mlog(LV_ERR, "TWOSTEP ruleproc unsuccessful: %s\n", mapi_strerror(err));
-	auto_meeting_reply(home_dir, address, pcontext->ctrl.from);
 	return DELIVERY_OPERATION_OK;
 } catch (const std::bad_alloc &) {
 	mlog(LV_ERR, "E-1472: ENOMEM");
