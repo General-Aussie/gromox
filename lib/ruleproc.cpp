@@ -1026,7 +1026,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		}
 
 		mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", &responseAccepted);
-		if(rows.pparray[i]->set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+		if(rows.pparray[i]->set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
 		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
 
@@ -1036,7 +1036,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
-		if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+		if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
 		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
 
@@ -1208,9 +1208,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if (valdata[1].pvalue == nullptr)
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
-		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, par.cur.mid, &props, &problems))
-			return ecRpcFailed;
+		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+		// 	nullptr, CP_ACP, par.cur.mid, &props, &problems))
+		// 	return ecRpcFailed;
 	}
 	mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
     return ecSuccess;
