@@ -1036,19 +1036,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
-
-		auto propresponse = vals2.get<const uint8_t>(response_stat);
-		if (propresponse == nullptr)
-			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: got response status (initial check): %u", *propresponse);	
-
-		if (*propresponse == static_cast<unsigned char>(notresponded)){
-			mlog(LV_ERR, "W-PREC: not responded: %s", par.cur.dir.c_str());
-		} else {
-			mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", *propresponse);
-		}
-
-		mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", &responseAccepted);
 		if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
 		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
