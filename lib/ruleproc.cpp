@@ -988,7 +988,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	uint32_t proptag_buff[] = {
 		response_stat, busy_stat,
 	};
-	const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
+	PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 	TARRAY_SET rows;
 
 	static constexpr uint32_t tags3[] = {
