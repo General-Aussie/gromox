@@ -1000,13 +1000,13 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	};
 	const PROPTAG_ARRAY ptags = {std::size(tags3), deconst(tags3)};
 	const PROPTAG_ARRAY ptags2 = {std::size(tags2), deconst(tags2)};
-	tarray_set output_rows{};
+
 	if (!exmdb_client::query_table(dir, nullptr, CP_ACP, table_id, &proptags,
-	    0, row_count, &output_rows))
+	    0, row_count, &rows))
 		return ecError;
 
-	for (unsigned int i = 0; i < output_rows.count; ++i) {
-		auto row   = output_rows.pparray[i];
+	for (unsigned int i = 0; i < rows.count; ++i) {
+		auto row = rows.pparray[i];
 		if (row == nullptr)
 			continue;
 
