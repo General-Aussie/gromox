@@ -991,14 +991,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 	TARRAY_SET rows;
 
-	static constexpr uint32_t tags[] = {
+	static constexpr uint32_t tags3[] = {
 		PR_RULE_MSG_STATE, PidTagMid, PR_RULE_MSG_SEQUENCE,
 		PR_RULE_MSG_PROVIDER,
 	};
 	static constexpr uint32_t tags2[] = {
 		PR_EXTENDED_RULE_MSG_CONDITION, PR_EXTENDED_RULE_MSG_ACTIONS,
 	};
-	const PROPTAG_ARRAY ptags = {std::size(tags), deconst(tags)};
+	const PROPTAG_ARRAY ptags = {std::size(tags3), deconst(tags3)};
 	const PROPTAG_ARRAY ptags2 = {std::size(tags2), deconst(tags2)};
 	tarray_set output_rows{};
 	if (!exmdb_client::query_table(dir, nullptr, CP_ACP, table_id, &proptags,
