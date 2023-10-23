@@ -1041,10 +1041,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
 
 
-		// uint32_t instanceId;
-		// if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, par.cur.mid, &instanceId))
-		// 	mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
-		// mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
+		uint32_t instanceId;
+		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, par.cur.mid, &instanceId))
+			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
 
 		// TAGGED_PROPVAL tmp_propvals[3];
 		// TPROPVAL_ARRAY propvals;
@@ -1062,9 +1062,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 		PROBLEM_ARRAY problems{};
 
-		// if(!exmdb_client::write_message_instance(dir, instanceId, par.ctnt, TRUE, &proptags, &problems))
-		// 	mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
-		// mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
+		if(!exmdb_client::write_message_instance(dir, instanceId, par.ctnt, TRUE, &proptags, &problems))
+			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
 
 		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 	    // 	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
