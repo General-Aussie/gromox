@@ -1038,10 +1038,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		pmessage_ids->pids[pmessage_ids->count++] = *pmid;
 		mlog(LV_ERR, "W-PREC: pmessage id count: %d", pmessage_ids->count);
 
-		TPROPVAL_ARRAY vals2{};
-		if (!exmdb_client::get_message_properties(dir, nullptr, CP_ACP,
-		    pmid, &proptags, &vals2))
-			continue;
+		// TPROPVAL_ARRAY vals2{};
+		// if (!exmdb_client::get_message_properties(dir, nullptr, CP_ACP,
+		//     pmid, &proptags, &vals2))
+		// 	continue;
 
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
@@ -1063,10 +1063,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
-		mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
-		if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
-			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
-		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
+		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
+		// if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
+		// 	mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
+		// mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
 
 
 		// uint32_t instanceId;
