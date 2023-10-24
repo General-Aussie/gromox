@@ -1032,7 +1032,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if (row == nullptr)
 			continue;
 		
-		auto pmid = tmp_set.pparray[i]->get<uint64_t>(PidTagMid);
+		auto pmid = rows.pparray[i]->get<uint64_t>(PidTagMid);
 		if (pmid == nullptr)
 			mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 		pmessage_ids->pids[pmessage_ids->count++] = *pmid;
