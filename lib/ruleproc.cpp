@@ -1019,13 +1019,13 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	    0, row_count, &rows))
 		return ecError;
 		
-	pmessage_ids = cu_alloc<EID_ARRAY>();
-	if (pmessage_ids == nullptr)
-		mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
-	pmessage_ids->count = 0;
-	pmessage_ids->pids = cu_alloc<uint64_t>(rows.count);
-	if (pmessage_ids->pids == nullptr)
-		mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
+	// pmessage_ids = cu_alloc<EID_ARRAY>();
+	// if (pmessage_ids == nullptr)
+	// 	mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
+	// pmessage_ids->count = 0;
+	// pmessage_ids->pids = cu_alloc<uint64_t>(rows.count);
+	// if (pmessage_ids->pids == nullptr)
+	// 	mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 
 	for (unsigned int i = 0; i < rows.count; ++i) {
 		auto row = rows.pparray[i];
@@ -1035,8 +1035,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto pmid = rows.pparray[i]->get<uint64_t>(PidTagMid);
 		if (pmid == nullptr)
 			mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
-		pmessage_ids->pids[pmessage_ids->count++] = *pmid;
-		mlog(LV_ERR, "W-PREC: pmessage id count: %d", pmessage_ids->count);
+
+		mlog(LV_ERR, "W-PREC: pmessage id count: %d", *pmid);
 
 		// TPROPVAL_ARRAY vals2{};
 		// if (!exmdb_client::get_message_properties(dir, nullptr, CP_ACP,
