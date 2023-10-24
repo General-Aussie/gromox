@@ -989,7 +989,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id); });
 
 	uint32_t proptag_buff[] = {
-		response_stat, busy_stat,
+		response_stat, busy_stat, PidTagMid,
 	};
 	PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 	TARRAY_SET rows;
@@ -1015,7 +1015,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	pproptags.count = 1;
 	pproptags.pproptag = &tmp_proptag;
 
-	if (!exmdb_client::query_table(dir, nullptr, CP_ACP, table_id, &pproptags,
+	if (!exmdb_client::query_table(dir, nullptr, CP_ACP, table_id, &proptags,
 	    0, row_count, &rows))
 		return ecError;
 		
