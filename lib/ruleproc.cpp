@@ -1036,7 +1036,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if (pmid == nullptr)
 			mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 
-		mlog(LV_ERR, "W-PREC: pmessage id count: %d", *pmid);
+		mlog(LV_ERR, "W-PREC: pmessage id count: %u", *pmid);
 
 		// TPROPVAL_ARRAY vals2{};
 		// if (!exmdb_client::get_message_properties(dir, nullptr, CP_ACP,
