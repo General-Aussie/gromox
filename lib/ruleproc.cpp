@@ -1027,21 +1027,21 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	// if (pmessage_ids->pids == nullptr)
 	// 	mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 
+	std::vector<uint64_t> pmidVector;  // Create a vector to store pmid values
+
 	for (unsigned int i = 0; i < rows.count; ++i) {
 		auto row = rows.pparray[i];
 		if (row == nullptr)
 			continue;
-		
+
 		auto pmid = rows.pparray[i]->get<uint64_t>(PidTagMid);
-		if (pmid == nullptr)
+		if (pmid == nullptr) {
 			mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
+		} else {
+			pmidVector.push_back(*pmid);  // Add pmid to the vector
+		}
 
-		mlog(LV_ERR, "W-PREC: pmessage id count: %u", *pmid);
-
-		// TPROPVAL_ARRAY vals2{};
-		// if (!exmdb_client::get_message_properties(dir, nullptr, CP_ACP,
-		//     pmid, &proptags, &vals2))
-		// 	continue;
+		// mlog(LV_ERR, "W-PREC: pmessage id count: %u", *pmid);
 
 		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
 		if (ts == nullptr)
@@ -1063,6 +1063,28 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
+
+		uint64_t change_num = 0, modtime = 0;
+		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
+			return ecRpcFailed;
+		auto change_key = xid_to_bin({GUID{}, change_num});
+		if (change_key == nullptr)
+			return ecServerOOM;
+		const TAGGED_PROPVAL valdata[] = {
+			{PidTagChangeNumber, &change_num},
+			{PR_CHANGE_KEY, change_key},
+			{PR_LOCAL_COMMIT_TIME, &modtime},
+			{PR_LAST_MODIFICATION_TIME, &modtime},
+		};
+
+		// const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+		// if (valdata[1].pvalue == nullptr)
+		// 	return ecServerOOM;
+		PROBLEM_ARRAY problems{};
+		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+			nullptr, CP_ACP, pmid, &props, &problems))
+			return ecRpcFailed;
+
 		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 		// if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 		// 	mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
