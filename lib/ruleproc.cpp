@@ -23,6 +23,9 @@
 #include <gromox/rop_util.hpp>
 #include <gromox/scope.hpp>
 #include <gromox/util.hpp>
+#include <gromox/exmdb_common_util.hpp>
+#include <gromox/list_file.hpp>
+#include <gromox/rop_util.hpp>
 
 // Extended MAPI Definitions
 #define POLICY_PROCESS_MEETING_REQUESTS              0x0001
@@ -1018,11 +1021,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		
 	pmessage_ids = cu_alloc<EID_ARRAY>();
 	if (pmessage_ids == nullptr)
-		return NULL;
+		mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 	pmessage_ids->count = 0;
-	pmessage_ids->pids = cu_alloc<uint64_t>(tmp_set.count);
+	pmessage_ids->pids = cu_alloc<uint64_t>(rows.count);
 	if (pmessage_ids->pids == nullptr)
-		return NULL;
+		mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 
 	for (unsigned int i = 0; i < rows.count; ++i) {
 		auto row = rows.pparray[i];
@@ -1031,7 +1034,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		
 		auto pmid = tmp_set.pparray[i]->get<uint64_t>(PidTagMid);
 		if (pmid == nullptr)
-			return NULL;
+			mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 		pmessage_ids->pids[pmessage_ids->count++] = *pmid;
 		mlog(LV_ERR, "W-PREC: pmessage id count: %d", pmessage_ids->count);
 
