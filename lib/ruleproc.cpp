@@ -1004,7 +1004,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	const PROPTAG_ARRAY ptags = {std::size(tags3), deconst(tags3)};
 	const PROPTAG_ARRAY ptags2 = {std::size(tags2), deconst(tags2)};
 
-	uint64_t pmid = nullptr;
 
 	// PROPTAG_ARRAY proptags;
 	// uint32_t table_id;
@@ -1036,11 +1035,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if (row == nullptr)
 			continue;
 
-		pmid = rows.pparray[i]->get<uint64_t>(PidTagMid);
+		auto pmid = rows.pparray[i]->get<uint64_t>(PidTagMid);
 		if (pmid == nullptr) {
 			mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 		} else {
-			pmidVector.push_back(pmid);  // Add pmid to the vector
+			pmidVector.push_back(*pmid);  // Add pmid to the vector
 		}
 
 		// mlog(LV_ERR, "W-PREC: pmessage id count: %u", *pmid);
@@ -1086,7 +1085,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, pmid, &props, &problems))
+			nullptr, CP_ACP, *pmid, &props, &problems))
 			return ecRpcFailed;
 
 		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
@@ -1290,9 +1289,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if (valdata[1].pvalue == nullptr)
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
-		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, pmid, &props, &problems))
-			return ecRpcFailed;
+		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+		// 	nullptr, CP_ACP, par.cur.mid, &props, &problems))
+		// 	return ecRpcFailed;
 		
 		uint32_t instanceId1;
 		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, par.cur.fid, par.cur.mid, &instanceId1))
