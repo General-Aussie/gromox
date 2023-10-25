@@ -1084,7 +1084,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, pmid, &props, &problems))
+			nullptr, CP_ACP, *pmid, &props, &problems))
 			return ecRpcFailed;
 
 		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
@@ -1112,7 +1112,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// tmp_propvals[2].proptag = PR_LAST_MODIFICATION_TIME;
 		// tmp_propvals[2].pvalue = &nt_time;
 
-		PROBLEM_ARRAY problems{};
+		PROBLEM_ARRAY problems1{};
 
 		if(!exmdb_client::write_message_instance(dir, instanceId, par.ctnt, TRUE, &proptags, &problems))
 			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
