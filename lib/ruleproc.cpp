@@ -995,7 +995,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	PROPTAG_ARRAY proptags_goid = {std::size(proptag_buff_goid), deconst(proptag_buff_goid)};
 
 	uint32_t proptag_buff[] = {
-		response_stat, busy_stat, goid, PidTagMid,
+		response_stat, busy_stat, goid, PidTagMid, PR_ENTRYID,
 	};
 	
 
@@ -1041,18 +1041,19 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	// 	mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 
 	std::vector<uint64_t> pmidVector;  // Create a vector to store pmid values
+	std::string UID;
 
 	for (unsigned int i = 0; i < rows.count; ++i) {
 		auto row = rows.pparray[i];
 		if (row == nullptr)
 			continue;
 
-		BINARY* goid_mid = rows.pparray[i]->get<const BINARY>(goid);
-		if (goid_mid != nullptr) {
-			// Assuming the BINARY data represents a null-terminated string
-			mlog(LV_ERR, "W-PREC: GlobalObjectId: %s", goid_mid->pb);
-		} else {
-			mlog(LV_ERR, "W-PREC: Unable to retrieve GlobalObjectId");
+		const BINARY* goid_mid = rows.pparray[i]->get<const BINARY>(goid);
+		if(goid_mid->cb > 0) {
+			std::string uid(goid_mid->cb*2+1, 0);
+			encode_hex_binary(goid_mid->pb, goid_mid->cb, uid.data(), int(uid.size()));
+			UID.emplace(std::move(uid));
+			mlog(LV_ERR, "W-PREC: GlobalObjectId: %s", UID);
 		}
 
 		auto pmid = rows.pparray[i]->get<uint64_t>(PidTagMid);
@@ -1105,7 +1106,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, goid_mid, &valhdr_1, &problems))
+			nullptr, CP_ACP, *pmid, &valhdr_1, &problems))
 			return ecRpcFailed;
 
 		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
@@ -1115,7 +1116,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 
 		uint32_t instanceId;
-		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, goid_mid, &instanceId))
+		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, *pmid, &instanceId))
 			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
 
@@ -1283,7 +1284,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 					return ecError;
 				mlog(LV_ERR, "W-PREC: busy status set %s", par.cur.dir.c_str());
 				props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted);
-				if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+				if (props.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
 					return ecError;
 				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted using props %s", par.cur.dir.c_str());
 				props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy);
@@ -1304,14 +1305,16 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{PR_CHANGE_KEY, change_key},
 			{PR_LOCAL_COMMIT_TIME, &modtime},
 			{PR_LAST_MODIFICATION_TIME, &modtime},
+			{response_stat, &responseAccepted},
+			{busy_stat, &busy},
 		};
-		// const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+		const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
 		if (valdata[1].pvalue == nullptr)
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
-		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-		// 	nullptr, CP_ACP, par.cur.mid, &props, &problems))
-		// 	return ecRpcFailed;
+		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+			return ecRpcFailed;
 		
 		uint32_t instanceId1;
 		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, par.cur.fid, par.cur.mid, &instanceId1))
