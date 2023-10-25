@@ -904,8 +904,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		return ecSuccess;
 
     auto cal_eid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
-    if (!cal_eid)
-        return ecError;
 
 	static constexpr uint32_t tags[] = {
 		PR_ENTRYID, PR_MESSAGE_CLASS, PR_START_DATE, PR_END_DATE, PR_RESPONSE_REQUESTED,
@@ -970,11 +968,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 	TPROPVAL_ARRAY props_new{};
 		if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), use_name,
-			CP_ACP, pmidVector[i], &proptags1, &props_new))
+			CP_ACP, par.cur.mid, &proptags1, &props_new))
 			return ecError;
 	
 	auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
-	auto recurrpatt = par.ctnt->proplist.get(PROP_TAG(PT_UNICODE, propids.ppropid[6]));
+	// auto recurrpatt = par.ctnt->proplist.get(PROP_TAG(PT_UNICODE, propids.ppropid[6]));
 	auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[7]));
 	auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]));
 	auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[9]));
@@ -1011,7 +1009,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 								return ecError;
 							if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 								return ecError;
-							snprintf(buffer, sizeof(buffer), "Meeting Declined");
 							mlog(LV_INFO, "Declined due to conflict.\n");
 						}   
 					}       
