@@ -1004,7 +1004,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	const PROPTAG_ARRAY ptags = {std::size(tags3), deconst(tags3)};
 	const PROPTAG_ARRAY ptags2 = {std::size(tags2), deconst(tags2)};
 
-	auto pmid = nullptr;
+	uint64_t pmid = nullptr;
 
 	// PROPTAG_ARRAY proptags;
 	// uint32_t table_id;
