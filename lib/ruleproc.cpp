@@ -1100,7 +1100,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{PR_LAST_MODIFICATION_TIME, &modtime},
 			{response_stat, &responseAccepted},
 			{busy_stat, &busy},
-			{PR_MESSAGE_CLASS, &deconst(appoint)},
+			{PR_MESSAGE_CLASS, deconst(&appoint)},
 		};
 
 		const TPROPVAL_ARRAY valhdr_1 = {std::size(valdata), deconst(valdata)};
@@ -1309,7 +1309,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{PR_LAST_MODIFICATION_TIME, &modtime},
 			{response_stat, &responseAccepted},
 			{busy_stat, &busy},
-			{PR_MESSAGE_CLASS, &deconst(appoint)},
+			{PR_MESSAGE_CLASS, deconst(&appoint)},
 		};
 		// const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
 		if (valdata[1].pvalue == nullptr)
