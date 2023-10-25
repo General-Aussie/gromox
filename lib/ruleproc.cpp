@@ -983,7 +983,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", cur_resp);
 
 	uint32_t table_id = 0, row_count = 0;
-	if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, use_name, TABLE_FLAG_NONOTIFICATIONS, &rst_10, nullptr, &table_id, &row_count))
+	if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_10, nullptr, &table_id, &row_count))
 		mlog(LV_ERR, "W-PREC: cannot load table content: %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: returned number of rows is: %d", row_count);
 	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id); });
@@ -1308,12 +1308,12 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{response_stat, &responseAccepted},
 			{busy_stat, &busy},
 		};
-		const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+		// const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
 		if (valdata[1].pvalue == nullptr)
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+			nullptr, CP_ACP, par.cur.mid, &props, &problems))
 			return ecRpcFailed;
 		
 		uint32_t instanceId1;
