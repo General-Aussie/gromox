@@ -1041,7 +1041,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	// 	mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
 
 	std::vector<uint64_t> pmidVector;  // Create a vector to store pmid values
-	std::string UID;
+	std::optional <std::string> UID;
 
 	for (unsigned int i = 0; i < rows.count; ++i) {
 		auto row = rows.pparray[i];
