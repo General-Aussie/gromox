@@ -1099,6 +1099,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{PR_LAST_MODIFICATION_TIME, &modtime},
 			{response_stat, &responseAccepted},
 			{busy_stat, &busy},
+			{PR_MESSAGE_CLASS, "IPM.Appointment"}
 		};
 
 		const TPROPVAL_ARRAY valhdr_1 = {std::size(valdata), deconst(valdata)};
@@ -1191,7 +1192,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecError;
 
 		props7.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted);
-		if (props7.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+		if (props7.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
 			return ecError;
 		mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted using props %s", par.cur.dir.c_str());
 		props7.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy);
@@ -1284,7 +1285,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 					return ecError;
 				mlog(LV_ERR, "W-PREC: busy status set %s", par.cur.dir.c_str());
 				props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted);
-				if (props.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
+				if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 					return ecError;
 				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted using props %s", par.cur.dir.c_str());
 				props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy);
@@ -1307,6 +1308,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{PR_LAST_MODIFICATION_TIME, &modtime},
 			{response_stat, &responseAccepted},
 			{busy_stat, &busy},
+			{PR_MESSAGE_CLASS, "IPM.Appointment"}
 		};
 		// const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
 		if (valdata[1].pvalue == nullptr)
@@ -1317,7 +1319,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecRpcFailed;
 		
 		uint32_t instanceId1;
-		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, par.cur.fid, par.cur.mid, &instanceId1))
+		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, par.cur.mid, &instanceId1))
 			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId1);
 
