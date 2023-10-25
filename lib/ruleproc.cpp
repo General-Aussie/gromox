@@ -1575,16 +1575,22 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	mlog(LV_ERR, "W-PREC: about entering for loop %s", par.cur.dir.c_str());
 	for (auto &&rule : rule_list) {
-		mlog(LV_ERR, "W-PREC: entering for loop %s", par.cur.dir.c_str());
-		err = op_process_meeting(par, rule);
-		if (err != ecSuccess){
-			mlog(LV_ERR, "W-PREC: cannot move/copy meeting request %s", par.cur.dir.c_str());
+		err = rule.extended ? opx_process(par, rule) : op_process_meeting(par, rule);
+		if (err != ecSuccess)
 			return err;
-		}
-		mlog(LV_ERR, "W-PREC: successfully move/copy meeting request %s", par.cur.dir.c_str());
 		if (par.del)
 			break;
 	}
+	// for (auto &&rule : rule_list) {
+	// 	err = op_process_meeting(par, rule);
+	// 	if (err != ecSuccess){
+	// 		mlog(LV_ERR, "W-PREC: cannot move/copy meeting request %s", par.cur.dir.c_str());
+	// 		return err;
+	// 	}
+	// 	mlog(LV_ERR, "W-PREC: successfully move/copy meeting request %s", par.cur.dir.c_str());
+	// 	if (par.del)
+	// 		break;
+	// }
 	if (par.del) {
 		const EID_ARRAY ids = {1, reinterpret_cast<uint64_t *>(&par.cur.mid)};
 		BOOL partial;
