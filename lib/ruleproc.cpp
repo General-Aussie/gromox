@@ -762,7 +762,7 @@ static ec_error_t op_accept(rxparam &par, const rule_node &rule, const ACTION_BL
 	if (g_ruleproc_debug)
 		mlog(LV_DEBUG, "Rule_Action %s", act.repr().c_str());
 		
-	act.type == OP_MOVE;
+	act.type = OP_MOVE;
 		
 	switch (act.type) {
 	case OP_MOVE:
@@ -1370,26 +1370,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	}
 	mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
     return ecSuccess;
-}
-
-static ec_error_t op_accept(rxparam &par, const rule_node &rule, const ACTION_BLOCK &act, size_t act_idx)
-{
-	if (g_ruleproc_debug)
-		mlog(LV_DEBUG, "Rule_Action %s", act.repr().c_str());
-		
-	act.type == OP_MOVE;
-	mlog(LV_ERR, "W-PREC: setting to op_move %s", par.cur.dir.c_str());
-		
-	switch (act.type) {
-	case OP_MOVE:
-	case OP_COPY: {
-		auto mc = static_cast<MOVECOPY_ACTION *>(act.pdata);
-		return mc != nullptr ? op_copy(par, rule, *mc, act.type) : ecSuccess;
-	}
-	default:
-		return ecSuccess;
-	}
-	mlog(LV_ERR, "W-PREC: finshed the accepting process %s", par.cur.dir.c_str());
 }
 
 ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
