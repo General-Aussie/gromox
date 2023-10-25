@@ -981,8 +981,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	bool isEquipmentMailbox = false;
 	bool isRoomMailbox = false;
 
-	if(!rx_resource_type(par, &isEquipmentMailbox, &isRoomMailbox))
-		return ecError;
+	auto res_err = rx_resource_type(par, &isEquipmentMailbox, &isRoomMailbox);
+	if (res_err != ecSuccess) {
+		return res_err;
+		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
+	}
 
     if (isRoomMailbox || isEquipmentMailbox) {
 		mlog(LV_ERR, "W-PREC: entering if statement %s", par.cur.dir.c_str());
