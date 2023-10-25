@@ -1176,6 +1176,9 @@ enum {
 	PidLidAppointmentTimeZoneDefinitionEndDisplay = 0x825F,
 	PidLidAppointmentTimeZoneDefinitionRecur = 0x8260,
 
+	/* PSETID_Meeting */
+	PidLidMeetingType = 0x0026,
+
 	/* PSETID_Common */
 	PidLidReminderDelta = 0x8501,
 	PidLidReminderTime = 0x8502,

@@ -653,127 +653,6 @@ static ec_error_t op_copy_other(rxparam &par, const rule_node &rule,
 	return ecSuccess;
 }
 
-static ec_error_t op_copy_other_meeting(rxparam &par, const rule_node &rule,
-    const MOVECOPY_ACTION &mc, uint8_t act_type)
-{
-	using LLU = unsigned long long;
-	/* Resolve store */
-	if (mc.pstore_eid == nullptr)
-		return ecNotFound;
-	auto &other_store = *static_cast<const STORE_ENTRYID *>(mc.pstore_eid);
-	if (other_store.pserver_name == nullptr)
-		return ecNotFound;
-	unsigned int user_id = 0, domain_id = 0;
-	char *newdir = nullptr;
-	if (!exmdb_client::store_eid_to_user(par.cur.dir.c_str(), &other_store,
-	    &newdir, &user_id, &domain_id))
-		return ecRpcFailed;
-	if (newdir == nullptr)
-		return ecNotFound;
-
-	/* Resolve folder */
-	auto tgt_public = other_store.wrapped_provider_uid == g_muidStorePublic;
-	if (!tgt_public && other_store.wrapped_provider_uid != g_muidStorePrivate)
-		/* try parsing as FOLDER_ENTRYID directly? (cf. cu_entryid_to_fid) */
-		return ecNotFound;
-	auto &fid_bin = *static_cast<const BINARY *>(mc.pfolder_eid);
-	uint64_t dst_fid, dst_mid = 0, dst_cn = 0;
-	if (fid_bin.cb == 0) {
-		dst_fid = rop_util_make_eid_ex(1, tgt_public ?
-		          PUBLIC_FID_IPMSUBTREE : PRIVATE_FID_INBOX);
-	} else {
-		FOLDER_ENTRYID folder_eid{};
-		EXT_PULL ep;
-		ep.init(fid_bin.pb, fid_bin.cb, malloc, EXT_FLAG_WCOUNT | EXT_FLAG_UTF16);
-		if (ep.g_folder_eid(&folder_eid) != pack_result::success)
-			return ecNotFound;
-		else if (folder_eid.folder_type == EITLT_PUBLIC_FOLDER && !tgt_public)
-			return ecNotFound;
-		else if (folder_eid.folder_type == EITLT_PRIVATE_FOLDER && tgt_public)
-			return ecNotFound;
-		dst_fid = rop_util_make_eid_ex(1, rop_util_gc_to_value(folder_eid.global_counter));
-	}
-	dst_fid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
-
-	/* Loop & permission checks. */
-	if (par.loop_check.find({newdir, dst_fid}) != par.loop_check.end())
-		return ecRootFolder;
-	uint32_t permission = 0;
-	if (!exmdb_client::get_folder_perm(newdir, dst_fid, par.ev_to, &permission))
-		return ecRpcFailed;
-	if (!(permission & (frightsOwner | frightsCreate)))
-		return ecAccessDenied;
-
-	/* Prepare write */
-	message_content_ptr dst(par.ctnt->dup());
-	if (dst == nullptr)
-		return ecMAPIOOM;
-	auto err = rx_npid_replace(par, *dst, newdir);
-	if (err != ecSuccess)
-		return err;
-	if (!exmdb_client::allocate_message_id(newdir, dst_fid, &dst_mid) ||
-	    !exmdb_client::allocate_cn(newdir, &dst_cn))
-		return ecRpcFailed;
-	XID zxid{tgt_public ? rop_util_make_domain_guid(user_id) :
-	         rop_util_make_user_guid(domain_id), dst_cn};
-	char xidbuf[22];
-	BINARY xidbin;
-	EXT_PUSH ep;
-	if (!ep.init(xidbuf, std::size(xidbuf), 0) ||
-	    ep.p_xid(zxid) != pack_result::success)
-		return ecMAPIOOM;
-	xidbin.pv = xidbuf;
-	xidbin.cb = ep.m_offset;
-	PCL pcl;
-	if (!pcl.append(zxid))
-		return ecMAPIOOM;
-	std::unique_ptr<BINARY, rx_delete> pclbin(pcl.serialize());
-	if (pclbin == nullptr)
-		return ecMAPIOOM;
-	auto &props = dst->proplist;
-	if (!props.has(PR_LAST_MODIFICATION_TIME)) {
-		auto last_time = rop_util_current_nttime();
-		auto ret = props.set(PR_LAST_MODIFICATION_TIME, &last_time);
-		if (ret != 0)
-			return ecError;
-	}
-	int ret;
-	if ((ret = props.set(PidTagMid, &dst_mid)) != 0 ||
-	    (ret = props.set(PidTagChangeNumber, &dst_cn)) != 0 ||
-	    (ret = props.set(PR_CHANGE_KEY, &xidbin)) != 0 ||
-	    (ret = props.set(PR_PREDECESSOR_CHANGE_LIST, pclbin.get())) != 0) {
-		return ecError;
-	}
-
-	/* Writeout */
-	ec_error_t e_result = ecRpcFailed;
-	if (!exmdb_client::write_message(newdir, other_store.pserver_name, CP_UTF8,
-	    dst_fid, dst.get(), &e_result)) {
-		mlog(LV_DEBUG, "ruleproc: write_message failed");
-		return ecRpcFailed;
-	} else if (e_result != ecSuccess) {
-		mlog(LV_DEBUG, "ruleproc: write_message: %s\n", mapi_strerror(e_result));
-		return ecRpcFailed;
-	}
-	if (g_ruleproc_debug)
-		mlog(LV_DEBUG, "ruleproc: OP_COPY/MOVE to %s:%llxh\n", newdir, LLU{dst_fid});
-
-	/* Copy done, delete original message object */
-	EID_ARRAY del_mids{};
-	del_mids.count = 1;
-	del_mids.pids = reinterpret_cast<uint64_t *>(&par.cur.mid);
-	BOOL partial = false;
-	if (!exmdb_client::delete_messages(par.cur.dir.c_str(),
-	    tgt_public ? domain_id : user_id, CP_UTF8,
-	    nullptr, par.cur.fid, &del_mids, true, &partial))
-		mlog(LV_ERR, "ruleproc: OP_MOVE del_msg %s:%llxh failed",
-			par.cur.dir.c_str(), LLU{rop_util_get_gc_value(par.cur.mid)});
-	par.cur.dir = newdir;
-	par.cur.fid = eid_t(dst_fid);
-	par.cur.mid = eid_t(dst_mid);
-	return ecSuccess;
-}
-
 static ec_error_t op_copy(rxparam &par, const rule_node &rule,
     const MOVECOPY_ACTION &mc, uint8_t act_type)
 {
@@ -798,31 +677,6 @@ static ec_error_t op_copy(rxparam &par, const rule_node &rule,
 		par.cur.fid = eid_t(dst_fid);
 		par.cur.mid = eid_t(dst_mid);
 	}
-	return ecSuccess;
-}
-
-static ec_error_t op_copy_meeting(rxparam &par, const rule_node &rule,
-    const MOVECOPY_ACTION &mc, uint8_t act_type)
-{
-	if (mc.pfolder_eid == nullptr)
-		return ecSuccess;
-	if (!mc.same_store)
-		return op_copy_other_meeting(par, rule, mc, act_type);
-	auto &svreid = *static_cast<const SVREID *>(mc.pfolder_eid);
-	auto dst_fid = svreid.folder_id;
-	if (rop_util_get_replid(dst_fid) != 1)
-		return ecNotFound;
-	if (par.loop_check.find({par.cur.dir, dst_fid}) != par.loop_check.end())
-		return ecSuccess;
-	uint64_t dst_mid = 0;
-	BOOL result = false;
-	if (!exmdb_client::allocate_message_id(par.cur.dir.c_str(), dst_fid, &dst_mid))
-		return ecRpcFailed;
-	if (!exmdb_client::movecopy_message(par.cur.dir.c_str(), 0, CP_ACP,
-	    par.cur.mid, dst_fid, dst_mid, TRUE, &result))
-		return ecRpcFailed;
-	par.cur.fid = eid_t(dst_fid);
-	par.cur.mid = eid_t(dst_mid);
 	return ecSuccess;
 }
 
@@ -903,16 +757,6 @@ static ec_error_t op_switch(rxparam &par, const rule_node &rule,
 	}
 }
 
-static ec_error_t op_switch_meeting(rxparam &par, const rule_node &rule, const ACTION_BLOCK &act, size_t act_idx)
-{
-	if (g_ruleproc_debug)
-		mlog(LV_DEBUG, "Rule_Action %s", act.repr().c_str());
-	mlog(LV_WARN, "W-1554: inside op_switch_meeting %s", par.cur.dir.c_str());
-		
-	auto mc = static_cast<MOVECOPY_ACTION *>(act.pdata);
-	return mc != nullptr ? op_copy_meeting(par, rule, *mc, act.type) : ecSuccess;
-}
-
 static ec_error_t op_process(rxparam &par, const rule_node &rule)
 {
 	if (par.exit && !(rule.state & ST_ONLY_WHEN_OOF))
@@ -929,33 +773,6 @@ static ec_error_t op_process(rxparam &par, const rule_node &rule)
 		return ecSuccess;
 	for (size_t i = 0; i < rule.act->count; ++i) {
 		auto ret = op_switch(par, rule, rule.act->pblock[i], i);
-		if (ret != ecSuccess)
-			return ret;
-	}
-	return ecSuccess;
-}
-
-static ec_error_t op_process_meeting(rxparam &par, const rule_node &rule)
-{
-	if (rule.cond != nullptr) {
-		mlog(LV_WARN, "W-1554: rule.cond is not null %s", par.cur.dir.c_str());
-		if (g_ruleproc_debug)
-			mlog(LV_DEBUG, "Rule_Condition %s", rule.cond->repr().c_str());
-		if (!rx_eval_props(par.ctnt, par.ctnt->proplist, *rule.cond))
-			return ecSuccess;
-	}
-	if (rule.act == nullptr){
-		mlog(LV_WARN, "W-1554: act is null %s", par.cur.dir.c_str());
-		return ecSuccess;
-	}
-	for (size_t i = 0; i < rule.act->count; ++i) {
-		auto err = op_switch_meeting(par, rule, rule.act->pblock[i], i);	
-		if (err != ecSuccess){
-			return err;
-			mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
-		}
-		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
-		auto ret = op_switch_meeting(par, rule, rule.act->pblock[i], i);
 		if (ret != ecSuccess)
 			return ret;
 	}
@@ -1065,20 +882,12 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto responseAccepted = olResponseAccepted;
 	auto notresponded = olResponseNotResponded;
 	auto busy = olBusy;
-    std::vector<freebusy_event> intersect;
-	char buffer[100];
 	auto appoint = "IPM.Appointment";
 
 	auto pmsg = par.ctnt; 
 	mlog(LV_ERR, "W-PREC: setting pmsg to par.ctnt %s", par.cur.dir.c_str());
 	if (pmsg == nullptr)
 		return ecError;
-
-	if (pmsg->proplist.count == 0){
-		mlog(LV_ERR, "W-PREC: proplist count is 0 %s", par.cur.dir.c_str());
-		return ecError;
-	}
-	mlog(LV_ERR, "W-PREC: proplist count is not zero %s", par.cur.dir.c_str());
 	
 	auto pmessage_class = pmsg->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
@@ -1094,17 +903,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	if (strcasecmp(pmessage_class, "IPM.Appointment") == 0)
 		return ecSuccess;
 
-	auto pdisplay_name = par.ctnt->proplist.get<char>(PR_DISPLAY_NAME);
-	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME: %s", pdisplay_name);
-
     auto cal_eid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
-    if (!cal_eid) {
-		snprintf(buffer, sizeof(buffer), "Unable to open calendar");
-        mlog(LV_ERR, "Unable to open calendar.\n");
+    if (!cal_eid)
         return ecError;
-    }
 
-	mlog(LV_ERR, "W-PREC: setting tags %s", par.cur.dir.c_str());
 	static constexpr uint32_t tags[] = {
 		PR_ENTRYID, PR_MESSAGE_CLASS, PR_START_DATE, PR_END_DATE, PR_RESPONSE_REQUESTED,
 		PR_REPLY_REQUESTED, PR_RECIPIENT_TRACKSTATUS, PidLidRecurring, PidLidResponseStatus,
@@ -1115,232 +917,32 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	TPROPVAL_ARRAY props{};
 	if (!exmdb_client::get_store_properties(dir, CP_UTF8, &pt, &props))
 		return ecError;
-	mlog(LV_ERR, "W-PREC: store properties gotten successfully %s", par.cur.dir.c_str());
+	auto use_name = props.get<char>(PR_DISPLAY_NAME);
+	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME: %s", use_name);
 
-	mlog(LV_ERR, "W-PREC: checking propname buff %s", par.cur.dir.c_str());
 	PROPERTY_NAME propname_buff[] = {
 		{MNID_ID, PSETID_APPOINTMENT, PidLidRecurring},
 		{MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus},
 		{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
 		{MNID_ID, PSETID_MEETING,     PidLidGlobalObjectId},
-		{MNID_ID, PSETID_APPOINTMENT, PidLidBusyStatus},
 		{MNID_ID, PSETID_COMMON, PidLidCommonStart},
 		{MNID_ID, PSETID_COMMON, PidLidCommonEnd},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidRecurrencePattern},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidAppointmentStateFlags},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidAppointmentSubType},
+		{MNID_ID, PSETID_MEETING, PidLidMeetingType},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidFInvited},
 	};
-
-	mlog(LV_ERR, "W-PREC: load propnames %s", par.cur.dir.c_str());
 
 	const PROPNAME_ARRAY propnames = {std::size(propname_buff), deconst(propname_buff)};
 	PROPID_ARRAY propids;
-	if (!exmdb_client::get_named_propids(dir, false, &propnames, &propids)){
-		mlog(LV_ERR, "W-PREC: cannot get names propids %s", par.cur.dir.c_str());
+	if (!exmdb_client::get_named_propids(dir, false, &propnames, &propids))
 		return ecError;
-	}
-
-	PROPERTY_NAME GlobalObjectId = {MNID_ID, PSETID_MEETING, PidLidGlobalObjectId};
 
 	auto goid = PROP_TAG(PT_BINARY, propids.ppropid[3]);
 	auto response_stat = PROP_TAG(PT_LONG, propids.ppropid[1]);
 	auto busy_stat = PROP_TAG(PT_LONG, propids.ppropid[2]);
-
-	// RESTRICTION_EXIST rst_1 = {GlobalObjectId.lid};
-	// RESTRICTION_PROPERTY prop_goid = {RELOP_EQ, GlobalObjectId.lid, {GlobalObjectId.lid, (&goid)}};
-	// RESTRICTION rst_2[2] = {{RES_EXIST, {&rst_1}}, {RES_PROPERTY, {&prop_goid}}};
-	// RESTRICTION_AND_OR rst_3 = {std::size(rst_2), rst_2};
-	// RESTRICTION rst_4 = {RES_AND, {&rst_3}};
-
-	static constexpr uint8_t fixed_true = 1;
-
-	RESTRICTION_EXIST rst_11 = {PR_MESSAGE_CLASS};
-	RESTRICTION_PROPERTY rst_6 = {RELOP_EQ, PR_MESSAGE_CLASS, {PR_MESSAGE_CLASS, deconst("IPM.Appointment")}};
-	RESTRICTION_PROPERTY rst_12 = {RELOP_EQ, PR_RESPONSE_REQUESTED, {PR_RESPONSE_REQUESTED, deconst(&fixed_true)}};
-	RESTRICTION rst_C3[3] = {{RES_EXIST, {&rst_11}}, {RES_PROPERTY, {&rst_6}}, {RES_PROPERTY, {&rst_12}}};
-	RESTRICTION_AND_OR rst_C3_and = {std::size(rst_C3), rst_C3};
-	RESTRICTION rst_10 = {RES_AND, {&rst_C3_and}};
-
-	mlog(LV_ERR, "W-PREC: creating the filter: %s", par.cur.dir.c_str());
-	auto use_name = props.get<char>(PR_DISPLAY_NAME);
-	mlog(LV_ERR, "W-PREC: PR_DISPLAY_NAME using props: %s", use_name);
-	if (!par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1])))
-		mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", use_name);
-	auto cur_resp = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_LONG, propids.ppropid[1]));
-	mlog(LV_ERR, "W-PREC: cannot get the response status of user: %s", cur_resp);
-
-	uint32_t table_id = 0, row_count = 0;
-	if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_10, nullptr, &table_id, &row_count))
-		mlog(LV_ERR, "W-PREC: cannot load table content: %s", par.cur.dir.c_str());
-	mlog(LV_ERR, "W-PREC: returned number of rows is: %d", row_count);
-	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id); });
-
-	uint32_t proptag_buff_goid[] = {
-		goid,
-	};
-
-	PROPTAG_ARRAY proptags_goid = {std::size(proptag_buff_goid), deconst(proptag_buff_goid)};
-
-	uint32_t proptag_buff[] = {
-		response_stat, busy_stat, goid, PidTagMid, PR_ENTRYID,
-	};
 	
-
-	PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
-	TARRAY_SET rows;
-
-	TPROPVAL_ARRAY props_goid{};
-	if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), use_name, CP_ACP, par.cur.mid, &proptags_goid, &props_goid))
-		return ecError;
-
-	static constexpr uint32_t tags3[] = {
-		PR_RULE_MSG_STATE, PidTagMid, PR_RULE_MSG_SEQUENCE,
-		PR_RULE_MSG_PROVIDER,
-	};
-	static constexpr uint32_t tags2[] = {
-		PR_EXTENDED_RULE_MSG_CONDITION, PR_EXTENDED_RULE_MSG_ACTIONS,
-	};
-	const PROPTAG_ARRAY ptags = {std::size(tags3), deconst(tags3)};
-	const PROPTAG_ARRAY ptags2 = {std::size(tags2), deconst(tags2)};
-
-
-	// PROPTAG_ARRAY proptags;
-	// uint32_t table_id;
-	// uint32_t row_count;
-	// TARRAY_SET tmp_set;
-	PROPTAG_ARRAY pproptags;
-	EID_ARRAY *pmessage_ids;
-
-	uint32_t tmp_proptag = PidTagMid;
-	pproptags.count = 1;
-	pproptags.pproptag = &tmp_proptag;
-
-	if (!exmdb_client::query_table(dir, nullptr, CP_ACP, table_id, &proptags,
-	    0, row_count, &rows))
-		return ecError;
-		
-	// pmessage_ids = cu_alloc<EID_ARRAY>();
-	// if (pmessage_ids == nullptr)
-	// 	mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
-	// pmessage_ids->count = 0;
-	// pmessage_ids->pids = cu_alloc<uint64_t>(rows.count);
-	// if (pmessage_ids->pids == nullptr)
-	// 	mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
-
-	std::vector<uint64_t> pmidVector;  // Create a vector to store pmid values
-	std::optional <std::string> UID;
-
-	for (unsigned int i = 0; i < rows.count; ++i) {
-		auto row = rows.pparray[i];
-		if (row == nullptr)
-			continue;
-
-		const BINARY* goid_mid = rows.pparray[i]->get<const BINARY>(goid);
-		if(goid_mid->cb > 0) {
-			std::string uid(goid_mid->cb*2+1, 0);
-			encode_hex_binary(goid_mid->pb, goid_mid->cb, uid.data(), int(uid.size()));
-			UID.emplace(std::move(uid));
-			mlog(LV_ERR, "W-PREC: GlobalObjectId: %s", UID);
-		}
-
-		auto pmid = rows.pparray[i]->get<uint64_t>(PidTagMid);
-		if (pmid == nullptr) {
-			mlog(LV_ERR, "W-PREC: return null: %s", par.cur.dir.c_str());
-		} else {
-			pmidVector.push_back(*pmid);  // Add pmid to the vector
-		}
-
-		// mlog(LV_ERR, "W-PREC: pmessage id count: %u", *pmid);
-
-		auto ts = rows.pparray[i]->get<const uint8_t>(response_stat);
-		if (ts == nullptr)
-			mlog(LV_ERR, "W-PREC: cannot get the response status: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: got response status (initial check): %u", *ts);	
-		if (*ts == static_cast<unsigned char>(notresponded)){
-			mlog(LV_ERR, "W-PREC: not responded: %s", par.cur.dir.c_str());
-		} else {
-			mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", *ts);
-		}
-
-		mlog(LV_ERR, "W-PREC: meeting accepted already if it shows 3 on this: %u", &responseAccepted);
-		if(rows.pparray[i]->set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
-			mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
-		mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
-
-		auto ts_new = rows.pparray[i]->get<const uint8_t>(response_stat);
-		mlog(LV_ERR, "W-PREC: got response status new: %u", *ts_new);
-	
-		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
-		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
-
-		uint64_t change_num = 0, modtime = 0;
-		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
-			return ecRpcFailed;
-		auto change_key = xid_to_bin({GUID{}, change_num});
-		if (change_key == nullptr)
-			return ecServerOOM;
-		const TAGGED_PROPVAL valdata[] = {
-			{PidTagChangeNumber, &change_num},
-			{PR_CHANGE_KEY, change_key},
-			{PR_LOCAL_COMMIT_TIME, &modtime},
-			{PR_LAST_MODIFICATION_TIME, &modtime},
-			{response_stat, &responseAccepted},
-			{busy_stat, &busy},
-			{PR_MESSAGE_CLASS, deconst(&appoint)},
-		};
-
-		const TPROPVAL_ARRAY valhdr_1 = {std::size(valdata), deconst(valdata)};
-		if (valdata[1].pvalue == nullptr)
-			return ecServerOOM;
-		PROBLEM_ARRAY problems{};
-		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, *pmid, &valhdr_1, &problems))
-			return ecRpcFailed;
-
-		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
-		// if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
-		// 	mlog(LV_ERR, "W-PREC: cannot set response status to accepted: %u", response_stat);
-		// mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
-
-
-		uint32_t instanceId;
-		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, *pmid, &instanceId))
-			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
-
-		// TAGGED_PROPVAL tmp_propvals[3];
-		// TPROPVAL_ARRAY propvals;
-
-		// propvals.count = 3;
-		// propvals.ppropval = tmp_propvals;
-
-		// tmp_propvals[0].proptag = proptag_buff[0];
-		// tmp_propvals[0].pvalue = deconst(&responseAccepted);
-		// auto nt_time = rop_util_current_nttime();
-		// tmp_propvals[1].proptag = PR_LOCAL_COMMIT_TIME_MAX;
-		// tmp_propvals[1].pvalue = &nt_time;
-		// tmp_propvals[2].proptag = PR_LAST_MODIFICATION_TIME;
-		// tmp_propvals[2].pvalue = &nt_time;
-
-		PROBLEM_ARRAY problems1{};
-
-		if(!exmdb_client::write_message_instance(dir, instanceId, par.ctnt, TRUE, &proptags, &problems))
-			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
-
-		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-	    // 	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
-		// 	mlog(LV_ERR, "W-PREC: cannot save message properties : %u", *ts);
-		// mlog(LV_ERR, "W-PREC: successfully set message property: %u", *ts);
-
-		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-		// 	nullptr, CP_ACP, par.cur.mid, &vals2, &problems))
-		// 	mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
-		// mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
-
-		// if (!exmdb_client::set_folder_properties(dir, CP_ACP,
-	    // 	cal_eid, &vals2, &problems))
-		// 	mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
-		// mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
-	}
-
 	uint32_t out_status = 0;
 	// mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
 	// if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
@@ -1358,61 +960,31 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	// 		mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	// 	}
 	// }
-
-	uint32_t proptag_buff1[] = {
-		response_stat, busy_stat, PR_MESSAGE_CLASS,
-	};
-	PROPTAG_ARRAY proptags1 = {std::size(proptag_buff1), deconst(proptag_buff1)};
-
-	for (unsigned int i = 0; i < pmidVector.size(); ++i) {
-		mlog(LV_ERR, "W-PREC: trying to use indivivdual pmid to set response value: %s", par.cur.dir.c_str());
-		// TPROPVAL_ARRAY result;
-		// if (!plugin.exmdb.get_message_properties(par.cur.dir.c_str(), use_name,
-		// 	CP_ACP, pmidVector[i], &proptags1, &result))
-
-		TPROPVAL_ARRAY props7{};
-		if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), use_name,
-			CP_ACP, pmidVector[i], &proptags1, &props7))
-			return ecError;
-
-		props7.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted);
-		if (props7.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
-			return ecError;
-		mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted using props %s", par.cur.dir.c_str());
-		props7.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy);
-		PROBLEM_ARRAY problems{};
-		mlog(LV_ERR, "W-PREC: setting indivivdual pmid to set response value: %s", par.cur.dir.c_str());
-		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			use_name, CP_ACP, pmidVector[i], &props7, &problems))
-			mlog(LV_ERR, "W-PREC: failed to set indivivdual pmid to set response value: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: successfully set indivivdual pmid to set response value: %s", par.cur.dir.c_str());
-	}
-
-	auto response_requested = par.ctnt->proplist.get<const uint8_t>(PR_RESPONSE_REQUESTED);
-	mlog(LV_ERR, "W-PREC: Checking for if response is requested %d", *response_requested);
-	if(response_requested){
-		*meetingresponse = true;
-	}
-	
-    auto flags = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
-
-	auto propmessage_class = props.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS with prop: %s", propmessage_class);
-
-	// TPROPVAL_ARRAY itemProps{};
-    // if (!exmdb_client::get_store_properties(par.cur.dir.c_str(), CP_UTF8, &pt, &itemProps))
-    //     return ecError;
-
-    // static const PROPERTY_NAME ResponseStatus = {MNID_ID, PSETID_APPOINTMENT, PidLidResponseStatus};
-    // const char* username = itemProps.get<char>(user_name_tag);
-
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
 
+	uint32_t proptag_buff[] = {
+		response_stat, busy_stat, PR_MESSAGE_CLASS,
+	};
+	PROPTAG_ARRAY proptags1 = {std::size(proptag_buff), deconst(proptag_buff)};
+
+	TPROPVAL_ARRAY props_new{};
+		if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), use_name,
+			CP_ACP, pmidVector[i], &proptags1, &props_new))
+			return ecError;
+	
+	auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+	auto recurrpatt = par.ctnt->proplist.get(PROP_TAG(PT_UNICODE, propids.ppropid[6]));
+	auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[7]));
+	auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]));
+	auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[9]));
+	auto finvited = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]));
+
 	bool isEquipmentMailbox = false;
 	bool isRoomMailbox = false;
+
 	if(!rx_resource_type(par, &isEquipmentMailbox, &isRoomMailbox))
-		mlog(LV_DEBUG, "W-1554: cannot check resource type %s", par.cur.dir.c_str());
+		return ecError;
 
     if (isRoomMailbox || isEquipmentMailbox) {
 		mlog(LV_ERR, "W-PREC: entering if statement %s", par.cur.dir.c_str());
@@ -1420,16 +992,15 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
         if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
             strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
 				mlog(LV_ERR, "W-PREC: message is a meeting request %s", par.cur.dir.c_str());
-                if (flags != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
+                if (recurring != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
 					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 						return ecError;
-					snprintf(buffer, sizeof(buffer), "Meeting Declined");
                     mlog(LV_INFO, "Declined due to recurrence against non-recurring policy.\n");
                 }
                 
 				if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
 					// non-recurring appointments
-					if (flags == nullptr || *flags == 0) {
+					if (recurring == nullptr || *recurring == 0) {
 						// At least one conflict
 						if (out_status == 1) {
 							// itemProps.set(ResponseStatus.lid, &responseDeclined);
@@ -1446,38 +1017,31 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 					}       
 					// recurring appointments
 					if(out_status == 1) {
-						// At least one conflict
-						// itemProps.set(ResponseStatus.lid, &responseDeclined);
-						// itemProps.set(ResponseStatus, &olResponseDeclined);
-						// if (itemProps.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-							// return ecError;
 						if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 							return ecError;
 						if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 							return ecError;
-						snprintf(buffer, sizeof(buffer), "Meeting Declined");
 						mlog(LV_INFO, "Declined due to conflict.\n");
 					}   
 				}
-				// itemProps.set(ResponseStatus.lid, &responseAccepted);
+		
 				if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 					return ecError;
 				if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
 					return ecError;
 				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted %s", par.cur.dir.c_str());
-				if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
+
+				if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 					return ecError;
-				mlog(LV_ERR, "W-PREC: busy status set %s", par.cur.dir.c_str());
-				props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted);
 				if (props.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
 					return ecError;
-				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted using props %s", par.cur.dir.c_str());
-				props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy);
-
-				snprintf(buffer, sizeof(buffer), "Meeting Accepted");
-				mlog(LV_ERR, "Accepted\n");
+				if (props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
+					return ecError;
+				// if (props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
+				// 	return ecError;
+				// if (props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
+				// 	return ecError;
 			}
-		mlog(LV_ERR, "W-PREC: create a response for the tracking status %s", par.cur.dir.c_str());
 			
 		uint64_t change_num = 0, modtime = 0;
 		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
@@ -1495,39 +1059,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{PR_MESSAGE_CLASS, deconst(&appoint)},
 		};
 		const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
-		// if (valdata[1].pvalue == nullptr)
-		// 	return ecServerOOM;
+		if (valdata[1].pvalue == nullptr)
+			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, par.cur.mid, &props, &problems))
+			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
 			return ecRpcFailed;
-		
-		uint32_t instanceId1;
-		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, par.cur.mid, &instanceId1))
-			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId1);
-
-		// TAGGED_PROPVAL tmp_propvals[3];
-		// TPROPVAL_ARRAY propvals;
-
-		// propvals.count = 3;
-		// propvals.ppropval = tmp_propvals;
-
-		// tmp_propvals[0].proptag = proptag_buff[0];
-		// tmp_propvals[0].pvalue = deconst(&responseAccepted);
-		// auto nt_time = rop_util_current_nttime();
-		// tmp_propvals[1].proptag = PR_LOCAL_COMMIT_TIME_MAX;
-		// tmp_propvals[1].pvalue = &nt_time;
-		// tmp_propvals[2].proptag = PR_LAST_MODIFICATION_TIME;
-		// tmp_propvals[2].pvalue = &nt_time;
-
-		PROBLEM_ARRAY problems2{};
-
-		if(!exmdb_client::write_message_instance(dir, instanceId1, par.ctnt, TRUE, &proptags1, &problems))
-			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
 	}
-	mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
+
 	uint64_t dst_mid = 0;
 	BOOL result = false;
 	mlog(LV_ERR, "W-PREC: allocating message id to copy/move %s", par.cur.dir.c_str());
@@ -1562,47 +1101,21 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	if (!exmdb_client::read_message(par.cur.dir.c_str(), nullptr, CP_ACP,
 	    par.cur.mid, &par.ctnt))
 		return ecError;
-	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
-	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
-	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
 
 	int policy = get_policy_from_message_content(par);
-	mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
-
-	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
-	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
 	bool meetingresponse = false;
 	err = process_meeting_requests(par, dir, policy, &meetingresponse);
-		
 	if (err != ecSuccess){
 		return err;
 		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
 	}
-	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
-	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
-	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
-	mlog(LV_ERR, "W-PREC: about entering for loop %s", par.cur.dir.c_str());
 	for (auto &&rule : rule_list) {
-		err = op_process_meeting(par, rule);
+		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)
 			return err;
 		if (par.del)
 			break;
 	}
-	mlog(LV_ERR, "W-PREC: left for loop %s", par.cur.dir.c_str());
-	// for (auto &&rule : rule_list) {
-	// 	err = op_process_meeting(par, rule);
-	// 	if (err != ecSuccess){
-	// 		mlog(LV_ERR, "W-PREC: cannot move/copy meeting request %s", par.cur.dir.c_str());
-	// 		return err;
-	// 	}
-	// 	mlog(LV_ERR, "W-PREC: successfully move/copy meeting request %s", par.cur.dir.c_str());
-	// 	if (par.del)
-	// 		break;
-	// }
 	if (par.del) {
 		const EID_ARRAY ids = {1, reinterpret_cast<uint64_t *>(&par.cur.mid)};
 		BOOL partial;
@@ -1614,28 +1127,6 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	if (!exmdb_client::notify_new_mail(par.cur.dir.c_str(),
 	    par.cur.fid, par.cur.mid))
 		mlog(LV_ERR, "ruleproc: newmail notification unsuccessful");
-	// auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	// mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
-	// mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
-	// mlog(LV_ERR, "W-PREC: check resource type %s", dir);
-
-	// int policy = get_policy_from_message_content(par);
-	// mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
-
-	// mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
-	// mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
-	// bool meetingresponse = false;
-	// err = process_meeting_requests(par, dir, policy, &meetingresponse);
-	
-	// if (err != ecSuccess){
-	// 	return err;
-	// 	mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
-	// }
-	// mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
-	// pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	// mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
-	// pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	// mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	return ecSuccess;
 } catch (const std::bad_alloc &) {
 	mlog(LV_ERR, "E-1121: ENOMEM");
