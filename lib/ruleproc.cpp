@@ -1528,6 +1528,17 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
 	}
 	mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
+	uint64_t dst_mid = 0;
+	BOOL result = false;
+	mlog(LV_ERR, "W-PREC: allocating message id to copy/move %s", par.cur.dir.c_str());
+	if (!exmdb_client::allocate_message_id(par.cur.dir.c_str(), cal_eid, &dst_mid))
+		return ecRpcFailed;
+	mlog(LV_ERR, "W-PREC: Done allocating message id to copy/move %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: about to copy/move %s", par.cur.dir.c_str());
+	if (!exmdb_client::movecopy_message(par.cur.dir.c_str(), 0, CP_ACP,
+	    par.cur.mid, cal_eid, dst_mid, TRUE, &result))
+		return ecRpcFailed;
+	mlog(LV_ERR, "W-PREC: done with copy/move successful %s", par.cur.dir.c_str());
     return ecSuccess;
 }
 
@@ -1561,21 +1572,20 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
-
-	for (auto &&rule : rule_list) {
-		bool meetingresponse = false;
-		err = process_meeting_requests(par, dir, policy, &meetingresponse);
+	bool meetingresponse = false;
+	err = process_meeting_requests(par, dir, policy, &meetingresponse);
 		
-		if (err != ecSuccess){
-			return err;
-			mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
-		}
-		mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
-		pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-		mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
-		pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-		mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
-		mlog(LV_ERR, "W-PREC: about entering for loop %s", par.cur.dir.c_str());
+	if (err != ecSuccess){
+		return err;
+		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
+	}
+	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
+	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
+	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
+	mlog(LV_ERR, "W-PREC: about entering for loop %s", par.cur.dir.c_str());
+	for (auto &&rule : rule_list) {
 		err = op_process_meeting(par, rule);
 		if (err != ecSuccess)
 			return err;
