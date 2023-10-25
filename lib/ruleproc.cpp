@@ -907,6 +907,7 @@ static ec_error_t op_switch_meeting(rxparam &par, const rule_node &rule, const A
 {
 	if (g_ruleproc_debug)
 		mlog(LV_DEBUG, "Rule_Action %s", act.repr().c_str());
+	mlog(LV_WARN, "W-1554: inside op_switch_meeting %s", par.cur.dir.c_str());
 		
 	auto mc = static_cast<MOVECOPY_ACTION *>(act.pdata);
 	return mc != nullptr ? op_copy_meeting(par, rule, *mc, act.type) : ecSuccess;
@@ -937,15 +938,16 @@ static ec_error_t op_process(rxparam &par, const rule_node &rule)
 static ec_error_t op_process_meeting(rxparam &par, const rule_node &rule)
 {
 	if (rule.cond != nullptr) {
+		mlog(LV_WARN, "W-1554: rule.cond is not null %s", par.cur.dir.c_str());
 		if (g_ruleproc_debug)
 			mlog(LV_DEBUG, "Rule_Condition %s", rule.cond->repr().c_str());
 		if (!rx_eval_props(par.ctnt, par.ctnt->proplist, *rule.cond))
 			return ecSuccess;
 	}
-	if (rule.state & ST_EXIT_LEVEL)
-		par.exit = true;
-	if (rule.act == nullptr)
+	if (rule.act == nullptr){
+		mlog(LV_WARN, "W-1554: act is null %s", par.cur.dir.c_str());
 		return ecSuccess;
+	}
 	for (size_t i = 0; i < rule.act->count; ++i) {
 		auto err = op_switch_meeting(par, rule, rule.act->pblock[i], i);	
 		if (err != ecSuccess){
@@ -1572,9 +1574,13 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	for (auto &&rule : rule_list) {
+		mlog(LV_ERR, "W-PREC: entering for loop %s", par.cur.dir.c_str());
 		err = op_process_meeting(par, rule);
-		if (err != ecSuccess)
+		if (err != ecSuccess){
+			mlog(LV_ERR, "W-PREC: cannot move/copy meeting request %s", par.cur.dir.c_str());
 			return err;
+		}
+		mlog(LV_ERR, "W-PREC: successfully move/copy meeting request %s", par.cur.dir.c_str());
 		if (par.del)
 			break;
 	}
