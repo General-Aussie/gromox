@@ -757,6 +757,24 @@ static ec_error_t op_switch(rxparam &par, const rule_node &rule,
 	}
 }
 
+static ec_error_t op_accept(rxparam &par, const rule_node &rule, const ACTION_BLOCK &act, size_t act_idx)
+{
+	if (g_ruleproc_debug)
+		mlog(LV_DEBUG, "Rule_Action %s", act.repr().c_str());
+		
+	act.type == OP_MOVE;
+		
+	switch (act.type) {
+	case OP_MOVE:
+	case OP_COPY: {
+		auto mc = static_cast<MOVECOPY_ACTION *>(act.pdata);
+		return mc != nullptr ? op_copy(par, rule, *mc, act.type) : ecSuccess;
+	}
+	default:
+		return ecSuccess;
+	}
+}
+
 static ec_error_t op_process(rxparam &par, const rule_node &rule)
 {
 	if (par.exit && !(rule.state & ST_ONLY_WHEN_OOF))
@@ -772,6 +790,12 @@ static ec_error_t op_process(rxparam &par, const rule_node &rule)
 	if (rule.act == nullptr)
 		return ecSuccess;
 	for (size_t i = 0; i < rule.act->count; ++i) {
+		auto err = op_accept(par, rule, rule.act->pblock[i], i);	
+		if (err != ecSuccess){
+			return err;
+			mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
+		}
+		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
 		auto ret = op_switch(par, rule, rule.act->pblock[i], i);
 		if (ret != ecSuccess)
 			return ret;
@@ -1279,14 +1303,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 				// itemProps.set(ResponseStatus.lid, &responseAccepted);
 				if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 					return ecError;
-				if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+				if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
 					return ecError;
 				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted %s", par.cur.dir.c_str());
 				if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
 					return ecError;
 				mlog(LV_ERR, "W-PREC: busy status set %s", par.cur.dir.c_str());
 				props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted);
-				if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+				if (props.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
 					return ecError;
 				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted using props %s", par.cur.dir.c_str());
 				props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy);
@@ -1316,7 +1340,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// 	return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+			nullptr, CP_ACP, par.cur.mid, &props, &problems))
 			return ecRpcFailed;
 		
 		uint32_t instanceId1;
@@ -1348,6 +1372,26 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
     return ecSuccess;
 }
 
+static ec_error_t op_accept(rxparam &par, const rule_node &rule, const ACTION_BLOCK &act, size_t act_idx)
+{
+	if (g_ruleproc_debug)
+		mlog(LV_DEBUG, "Rule_Action %s", act.repr().c_str());
+		
+	act.type == OP_MOVE;
+	mlog(LV_ERR, "W-PREC: setting to op_move %s", par.cur.dir.c_str());
+		
+	switch (act.type) {
+	case OP_MOVE:
+	case OP_COPY: {
+		auto mc = static_cast<MOVECOPY_ACTION *>(act.pdata);
+		return mc != nullptr ? op_copy(par, rule, *mc, act.type) : ecSuccess;
+	}
+	default:
+		return ecSuccess;
+	}
+	mlog(LV_ERR, "W-PREC: finshed the accepting process %s", par.cur.dir.c_str());
+}
+
 ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
     const char *ev_to, eid_t folder_id, eid_t msg_id) try
 {
@@ -1368,6 +1412,28 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	if (!exmdb_client::read_message(par.cur.dir.c_str(), nullptr, CP_ACP,
 	    par.cur.mid, &par.ctnt))
 		return ecError;
+	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
+	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
+
+	int policy = get_policy_from_message_content(par);
+	mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
+
+	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
+	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
+	bool meetingresponse = false;
+	err = process_meeting_requests(par, dir, policy, &meetingresponse);
+	
+	if (err != ecSuccess){
+		return err;
+		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
+	}
+	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
+	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
+	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	for (auto &&rule : rule_list) {
 		err = rule.extended ? opx_process(par, rule) : op_process(par, rule);
 		if (err != ecSuccess)
@@ -1386,27 +1452,28 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	if (!exmdb_client::notify_new_mail(par.cur.dir.c_str(),
 	    par.cur.fid, par.cur.mid))
 		mlog(LV_ERR, "ruleproc: newmail notification unsuccessful");
-	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
-	mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
-	mlog(LV_ERR, "W-PREC: check resource type %s", dir);
+	// auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	// mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
+	// mlog(LV_ERR, "W-PREC: check resource type %s", par.cur.dir.c_str());
+	// mlog(LV_ERR, "W-PREC: check resource type %s", dir);
 
-	int policy = get_policy_from_message_content(par);
-	mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
+	// int policy = get_policy_from_message_content(par);
+	// mlog(LV_ERR, "W-PREC: check policy finished %s", par.cur.dir.c_str());
 
-	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
-	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
-	bool meetingresponse = false;
-	err = process_meeting_requests(par, dir, policy, &meetingresponse);
-	if (err != ecSuccess){
-		return err;
-		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
-	}
-	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
-	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
-	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
+	// mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
+	// mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
+	// bool meetingresponse = false;
+	// err = process_meeting_requests(par, dir, policy, &meetingresponse);
+	
+	// if (err != ecSuccess){
+	// 	return err;
+	// 	mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", strerror(ecSuccess));
+	// }
+	// mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
+	// pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	// mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
+	// pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+	// mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
 	return ecSuccess;
 } catch (const std::bad_alloc &) {
 	mlog(LV_ERR, "E-1121: ENOMEM");
