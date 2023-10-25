@@ -1311,13 +1311,13 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{busy_stat, &busy},
 			{PR_MESSAGE_CLASS, deconst(&appoint)},
 		};
-		// const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
-		if (valdata[1].pvalue == nullptr)
-			return ecServerOOM;
+		const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+		// if (valdata[1].pvalue == nullptr)
+		// 	return ecServerOOM;
 		PROBLEM_ARRAY problems{};
-		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-		// 	nullptr, CP_ACP, par.cur.mid, &props, &problems))
-		// 	return ecRpcFailed;
+		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+			return ecRpcFailed;
 		
 		uint32_t instanceId1;
 		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, par.cur.mid, &instanceId1))
