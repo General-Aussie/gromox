@@ -1064,26 +1064,26 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 
-		uint64_t change_num = 0, modtime = 0;
-		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
-			return ecRpcFailed;
-		auto change_key = xid_to_bin({GUID{}, change_num});
-		if (change_key == nullptr)
-			return ecServerOOM;
-		const TAGGED_PROPVAL valdata[] = {
-			{PidTagChangeNumber, &change_num},
-			{PR_CHANGE_KEY, change_key},
-			{PR_LOCAL_COMMIT_TIME, &modtime},
-			{PR_LAST_MODIFICATION_TIME, &modtime},
-		};
+		// uint64_t change_num = 0, modtime = 0;
+		// if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
+		// 	return ecRpcFailed;
+		// auto change_key = xid_to_bin({GUID{}, change_num});
+		// if (change_key == nullptr)
+		// 	return ecServerOOM;
+		// const TAGGED_PROPVAL valdata[] = {
+		// 	{PidTagChangeNumber, &change_num},
+		// 	{PR_CHANGE_KEY, change_key},
+		// 	{PR_LOCAL_COMMIT_TIME, &modtime},
+		// 	{PR_LAST_MODIFICATION_TIME, &modtime},
+		// };
 
 		// const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
 		// if (valdata[1].pvalue == nullptr)
 		// 	return ecServerOOM;
-		PROBLEM_ARRAY problems{};
-		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, pmid, &props, &problems))
-			return ecRpcFailed;
+		// PROBLEM_ARRAY problems{};
+		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+		// 	nullptr, CP_ACP, pmid, &props, &problems))
+		// 	return ecRpcFailed;
 
 		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 		// if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
@@ -1149,6 +1149,43 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	// 		mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	// 	}
 	// }
+
+	uint32_t proptag_buff1[] = {
+		response_stat, busy_stat,
+	};
+	PROPTAG_ARRAY proptags1 = {std::size(proptag_buff1), deconst(proptag_buff1)};
+
+	for (unsigned int i = 0; i < pmidVector.size(); ++i) {
+		mlog(LV_ERR, "W-PREC: trying to use indivivdual pmid to set response value: %s", par.cur.dir.c_str());
+		// TPROPVAL_ARRAY result;
+		// if (!plugin.exmdb.get_message_properties(par.cur.dir.c_str(), use_name,
+		// 	CP_ACP, pmidVector[i], &proptags1, &result))
+
+		uint64_t change_num1 = 0, modtime1 = 0;
+		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num1))
+			return ecRpcFailed;
+		auto change_key1 = xid_to_bin({GUID{}, change_num1});
+		if (change_key1 == nullptr)
+			return ecServerOOM;
+		mlog(LV_ERR, "W-PREC: about to use indivivdual pmid to set response value: %s", par.cur.dir.c_str());
+		const TAGGED_PROPVAL valdata1[] = {
+			{PidTagChangeNumber, &change_num1},
+			{PR_CHANGE_KEY, change_key1},
+			{PR_LOCAL_COMMIT_TIME, &modtime1},
+			{PR_LAST_MODIFICATION_TIME, &modtime1},
+			{response_stat, &responseAccepted},
+		};
+		const TPROPVAL_ARRAY valhdr1 = {std::size(valdata1), deconst(valdata1)};
+		if (valdata1[1].pvalue == nullptr)
+			return ecServerOOM;
+		PROBLEM_ARRAY problems{};
+		mlog(LV_ERR, "W-PREC: setting indivivdual pmid to set response value: %s", par.cur.dir.c_str());
+		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+			use_name, CP_ACP, pmidVector[i], &valhdr1, &problems))
+			mlog(LV_ERR, "W-PREC: failed to set indivivdual pmid to set response value: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: successfully set indivivdual pmid to set response value: %s", par.cur.dir.c_str());
+	}
+
 	auto response_requested = par.ctnt->proplist.get<const uint8_t>(PR_RESPONSE_REQUESTED);
 	mlog(LV_ERR, "W-PREC: Checking for if response is requested %d", *response_requested);
 	if(response_requested){
