@@ -988,11 +988,23 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: returned number of rows is: %d", row_count);
 	auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id); });
 
-	uint32_t proptag_buff[] = {
-		response_stat, busy_stat, PidTagMid,
+	uint32_t proptag_buff_goid[] = {
+		goid,
 	};
+
+	PROPTAG_ARRAY proptags_goid = {std::size(proptag_buff_goid), deconst(proptag_buff_goid)};
+
+	uint32_t proptag_buff[] = {
+		response_stat, busy_stat, goid, PidTagMid,
+	};
+	
+
 	PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 	TARRAY_SET rows;
+
+	TPROPVAL_ARRAY props_goid{};
+	if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), use_name, CP_ACP, par.cur.mid, &proptags_goid, &props_goid))
+		return ecError;
 
 	static constexpr uint32_t tags3[] = {
 		PR_RULE_MSG_STATE, PidTagMid, PR_RULE_MSG_SEQUENCE,
@@ -1034,6 +1046,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto row = rows.pparray[i];
 		if (row == nullptr)
 			continue;
+
+		BINARY* goid_mid = rows.pparray[i]->get<const BINARY>(goid);
+		if (goid_mid != nullptr) {
+			// Assuming the BINARY data represents a null-terminated string
+			mlog(LV_ERR, "W-PREC: GlobalObjectId: %s", goid_mid->pb);
+		} else {
+			mlog(LV_ERR, "W-PREC: Unable to retrieve GlobalObjectId");
+		}
 
 		auto pmid = rows.pparray[i]->get<uint64_t>(PidTagMid);
 		if (pmid == nullptr) {
@@ -1080,12 +1100,12 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{busy_stat, &busy},
 		};
 
-		const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+		const TPROPVAL_ARRAY valhdr_1 = {std::size(valdata), deconst(valdata)};
 		if (valdata[1].pvalue == nullptr)
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, *pmid, &props, &problems))
+			nullptr, CP_ACP, goid_mid, &valhdr_1, &problems))
 			return ecRpcFailed;
 
 		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
@@ -1095,7 +1115,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 
 		uint32_t instanceId;
-		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, *pmid, &instanceId))
+		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, goid_mid, &instanceId))
 			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
 
@@ -1289,9 +1309,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if (valdata[1].pvalue == nullptr)
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
-		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, par.cur.mid, &props, &problems))
-			return ecRpcFailed;
+		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+		// 	nullptr, CP_ACP, par.cur.mid, &props, &problems))
+		// 	return ecRpcFailed;
 		
 		uint32_t instanceId1;
 		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, par.cur.fid, par.cur.mid, &instanceId1))
