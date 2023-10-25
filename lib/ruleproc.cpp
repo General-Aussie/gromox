@@ -1561,26 +1561,28 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 
 	mlog(LV_DEBUG, "W-1554: Process meeting request %s", par.cur.dir.c_str());
 	mlog(LV_ERR, "W-PREC: Process meeting request %s", par.cur.dir.c_str());
-	bool meetingresponse = false;
-	err = process_meeting_requests(par, dir, policy, &meetingresponse);
-	
-	if (err != ecSuccess){
-		return err;
-		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
-	}
-	mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
-	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
-	pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
-	mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
-	mlog(LV_ERR, "W-PREC: about entering for loop %s", par.cur.dir.c_str());
+
 	for (auto &&rule : rule_list) {
-		err = rule.extended ? opx_process(par, rule) : op_process_meeting(par, rule);
+		bool meetingresponse = false;
+		err = process_meeting_requests(par, dir, policy, &meetingresponse);
+		
+		if (err != ecSuccess){
+			return err;
+			mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
+		}
+		mlog(LV_ERR, "W-PREC: Process meeting request done %s", par.cur.dir.c_str());
+		pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+		mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);	
+		pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
+		mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS: %s", pmessage_class);
+		mlog(LV_ERR, "W-PREC: about entering for loop %s", par.cur.dir.c_str());
+		err = op_process_meeting(par, rule);
 		if (err != ecSuccess)
 			return err;
 		if (par.del)
 			break;
 	}
+	mlog(LV_ERR, "W-PREC: left for loop %s", par.cur.dir.c_str());
 	// for (auto &&rule : rule_list) {
 	// 	err = op_process_meeting(par, rule);
 	// 	if (err != ecSuccess){
