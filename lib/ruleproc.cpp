@@ -881,7 +881,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto notresponded = olResponseNotResponded;
-	uint8_t busy = olBusy;
+	auto busy = olBusy;
     std::vector<freebusy_event> intersect;
 	char buffer[100];
 
@@ -1064,26 +1064,28 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto num = rows.pparray[i]->get<const uint32_t>(busy_stat);
 		uint32_t busy_type = num == nullptr || *num > olWorkingElsewhere ? 0 : *num;
 
-		// uint64_t change_num = 0, modtime = 0;
-		// if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
-		// 	return ecRpcFailed;
-		// auto change_key = xid_to_bin({GUID{}, change_num});
-		// if (change_key == nullptr)
-		// 	return ecServerOOM;
-		// const TAGGED_PROPVAL valdata[] = {
-		// 	{PidTagChangeNumber, &change_num},
-		// 	{PR_CHANGE_KEY, change_key},
-		// 	{PR_LOCAL_COMMIT_TIME, &modtime},
-		// 	{PR_LAST_MODIFICATION_TIME, &modtime},
-		// };
+		uint64_t change_num = 0, modtime = 0;
+		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
+			return ecRpcFailed;
+		auto change_key = xid_to_bin({GUID{}, change_num});
+		if (change_key == nullptr)
+			return ecServerOOM;
+		const TAGGED_PROPVAL valdata[] = {
+			{PidTagChangeNumber, &change_num},
+			{PR_CHANGE_KEY, change_key},
+			{PR_LOCAL_COMMIT_TIME, &modtime},
+			{PR_LAST_MODIFICATION_TIME, &modtime},
+			{response_stat, &responseAccepted},
+			{busy_stat, &busy},
+		};
 
-		// const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
-		// if (valdata[1].pvalue == nullptr)
-		// 	return ecServerOOM;
-		// PROBLEM_ARRAY problems{};
-		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-		// 	nullptr, CP_ACP, pmid, &props, &problems))
-		// 	return ecRpcFailed;
+		const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+		if (valdata[1].pvalue == nullptr)
+			return ecServerOOM;
+		PROBLEM_ARRAY problems{};
+		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+			nullptr, CP_ACP, pmid, &props, &problems))
+			return ecRpcFailed;
 
 		// mlog(LV_ERR, "W-PREC: finalcheck for ts_new: %u", *ts_new);
 		// if(vals2.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
@@ -1091,10 +1093,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// mlog(LV_ERR, "W-PREC: setting response status to accepted: %u", response_stat);
 
 
-		// uint32_t instanceId;
-		// if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, par.cur.mid, &instanceId))
-		// 	mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
-		// mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
+		uint32_t instanceId;
+		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, pmid, &instanceId))
+			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
 
 		// TAGGED_PROPVAL tmp_propvals[3];
 		// TPROPVAL_ARRAY propvals;
@@ -1110,11 +1112,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// tmp_propvals[2].proptag = PR_LAST_MODIFICATION_TIME;
 		// tmp_propvals[2].pvalue = &nt_time;
 
-		// PROBLEM_ARRAY problems{};
+		PROBLEM_ARRAY problems{};
 
-		// if(!exmdb_client::write_message_instance(dir, instanceId, par.ctnt, TRUE, &proptags, &problems))
-		// 	mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
-		// mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
+		if(!exmdb_client::write_message_instance(dir, instanceId, par.ctnt, TRUE, &proptags, &problems))
+			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
 
 		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 	    // 	nullptr, CP_ACP, par.cur.mid, &propvals, &problems))
@@ -1291,9 +1293,34 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if (valdata[1].pvalue == nullptr)
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
-		// if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-		// 	nullptr, CP_ACP, par.cur.mid, &props, &problems))
-		// 	return ecRpcFailed;
+		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+			nullptr, CP_ACP, par.cur.mid, &props, &problems))
+			return ecRpcFailed;
+		
+		uint32_t instanceId1;
+		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, par.cur.fid, par.cur.mid, &instanceId1))
+			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId1);
+
+		// TAGGED_PROPVAL tmp_propvals[3];
+		// TPROPVAL_ARRAY propvals;
+
+		// propvals.count = 3;
+		// propvals.ppropval = tmp_propvals;
+
+		// tmp_propvals[0].proptag = proptag_buff[0];
+		// tmp_propvals[0].pvalue = deconst(&responseAccepted);
+		// auto nt_time = rop_util_current_nttime();
+		// tmp_propvals[1].proptag = PR_LOCAL_COMMIT_TIME_MAX;
+		// tmp_propvals[1].pvalue = &nt_time;
+		// tmp_propvals[2].proptag = PR_LAST_MODIFICATION_TIME;
+		// tmp_propvals[2].pvalue = &nt_time;
+
+		PROBLEM_ARRAY problems2{};
+
+		if(!exmdb_client::write_message_instance(dir, instanceId1, par.ctnt, TRUE, &props, &problems))
+			mlog(LV_ERR, "W-PREC: cannot save message properties using write message properties : %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: successfully set message property using write message properties: %s", par.cur.dir.c_str());
 	}
 	mlog(LV_ERR, "W-PREC: finshed the if statement %s", par.cur.dir.c_str());
     return ecSuccess;
