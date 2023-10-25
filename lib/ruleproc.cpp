@@ -1095,7 +1095,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 
 		uint32_t instanceId;
-		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, pmid, &instanceId))
+		if(!exmdb_client::load_message_instance(dir, nullptr, CP_ACP, false, cal_eid, *pmid, &instanceId))
 			mlog(LV_ERR, "W-PREC: cannot get message instance: %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: this is the message instance %d", &instanceId);
 
