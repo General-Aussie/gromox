@@ -947,7 +947,7 @@ static ec_error_t op_process_meeting(rxparam &par, const rule_node &rule)
 	if (rule.act == nullptr)
 		return ecSuccess;
 	for (size_t i = 0; i < rule.act->count; ++i) {
-		auto err = op_accept(par, rule, rule.act->pblock[i], i);	
+		auto err = op_switch_meeting(par, rule, rule.act->pblock[i], i);	
 		if (err != ecSuccess){
 			return err;
 			mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
