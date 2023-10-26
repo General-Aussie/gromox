@@ -933,6 +933,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		{MNID_ID, PSETID_APPOINTMENT, PidLidAppointmentSubType},
 		{MNID_ID, PSETID_MEETING, PidLidMeetingType},
 		{MNID_ID, PSETID_APPOINTMENT, PidLidFInvited},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidAppointmentStartWhole},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidAppointmentEndWhole},
+		{MNID_ID, PSETID_APPOINTMENT, PidLidClipEnd},
 	};
 
 	const PROPNAME_ARRAY propnames = {std::size(propname_buff), deconst(propname_buff)};
@@ -943,6 +946,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto goid = PROP_TAG(PT_BINARY, propids.ppropid[3]);
 	auto response_stat = PROP_TAG(PT_LONG, propids.ppropid[1]);
 	auto busy_stat = PROP_TAG(PT_LONG, propids.ppropid[2]);
+	auto apptstartwhole = PROP_TAG(PT_SYSTIME, propids.ppropid[11]);
+	auto apptendwhole   = PROP_TAG(PT_SYSTIME, propids.ppropid[12]);
+	auto clipend = PROP_TAG(PT_SYSTIME, propids.ppropid[13]);
 
 	uint32_t permission = 0;
 	auto cal_eid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
@@ -990,8 +996,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto end = rop_util_nttime_to_unix(end_whole);
 
 		/* C1: apptstartwhole <= start && apptendwhole >= end */
-		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, PR_START_DATE, {PR_START_DATE, &startt}};
-		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, PR_END_DATE, {PR_END_DATE, &endd}};
+		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &startt}};
+		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, apptendwhole, {apptendwhole, &endd}};
 		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 		RESTRICTION rst_6          = {RES_OR, {&rst_4}};
