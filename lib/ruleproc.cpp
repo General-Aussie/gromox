@@ -990,9 +990,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// Assume no conflict initially
 
 		/* C1: apptstartwhole <= start && apptendwhole >= end */
-		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &start}};
-		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, apptendwhole, {apptendwhole, &end}};
-		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
+		RESTRICTION_PROPERTY rst_1 = {RELOP_EQ, PR_START_DATE, {PR_START_DATE, &start}};
+		RESTRICTION_PROPERTY rst_2 = {RELOP_EQ, PR_END_DATE, {PR_END_DATE, &end}};
+		RESTRICTION_PROPERTY rst_7 = {RELOP_EQ, busy_stat, {busy_stat, &busy}};
+		RESTRICTION rst_3[3]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}, {RES_PROPERTY, {&rst_7}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 		RESTRICTION rst_6          = {RES_OR, {&rst_4}};
 
