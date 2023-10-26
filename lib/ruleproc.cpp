@@ -908,8 +908,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	if (strcasecmp(pmessage_class, "IPM.Appointment") == 0)
 		return ecSuccess;
 
-    auto cal_eid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
-
 	static constexpr uint32_t tags[] = {
 		PR_ENTRYID, PR_MESSAGE_CLASS, PR_START_DATE, PR_END_DATE, PR_RESPONSE_REQUESTED,
 		PR_REPLY_REQUESTED, PR_RECIPIENT_TRACKSTATUS, PidLidRecurring, PidLidResponseStatus,
@@ -945,6 +943,18 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto goid = PROP_TAG(PT_BINARY, propids.ppropid[3]);
 	auto response_stat = PROP_TAG(PT_LONG, propids.ppropid[1]);
 	auto busy_stat = PROP_TAG(PT_LONG, propids.ppropid[2]);
+
+	uint32_t permission = 0;
+	auto cal_eid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
+
+	if (username != nullptr) {
+		if (!exmdb_client::get_folder_perm(dir, cal_eid, use_name, &permission))
+			return false;
+		if (!(permission & (frightsFreeBusySimple | frightsFreeBusyDetailed | frightsReadAny)))
+			return false;
+	} else {
+		permission = frightsFreeBusyDetailed | frightsReadAny;
+	}
 	
 	uint32_t out_status = 0;
 	mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
@@ -979,36 +989,68 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto start = rop_util_nttime_to_unix(start_whole);
 		auto end = rop_util_nttime_to_unix(end_whole);
 
-		if (!get_freebusy(dir, use_name, start, end, freebusyData))
-		{
-			mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
-		}
-		mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
+		/* C1: apptstartwhole <= start && apptendwhole >= end */
+		RESTRICTION_PROPERTY rst_1 = {RELOP_LE, PR_START_DATE, {PR_START_DATE, &startt}};
+		RESTRICTION_PROPERTY rst_2 = {RELOP_GE, PR_END_DATE, {PR_END_DATE, &endd}};
+		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
+		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
+		RESTRICTION rst_6          = {RES_OR, {&rst_4}};
 
-		// Iterate through free/busy events and check for conflicts
-		for (const freebusy_event &event : freebusyData)
-		{
-			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
-			auto event_start_time = event.start_time;
-			auto event_end_time = event.end_time;
+		uint32_t table_id = 0, row_count = 0;
+		if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_6, nullptr, &table_id, &row_count))
+			mlog(LV_ERR, "W-PREC: cannot load table content: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: returned number of rows is: %d", row_count);
+		auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
 
-			bool is_recurring = event.details && event.details->is_recurring;
-			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
-			// Check for overlap with existing appointments
-			if ((event_start_time >= start && event_start_time <= end) ||
-				(event_end_time >= start && event_end_time <= end) ||
-				(event_start_time < start && event_end_time > end) ||
-				(is_recurring && event_end_time >= start) ||
-				(!is_recurring && event_start_time <= end))
-			{
-				// Conflict found, set the status and return
-				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
-				out_status = 1;
-			}
+		uint32_t proptag_buff[] = {
+			PR_ENTRYID, PR_START_DATE, PR_END_DATE,
+		};
+		const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
+		TARRAY_SET rows;
+		if (!exmdb_client::query_table(par.cur.dir.c_str(), nullptr, CP_ACP, table_id,
+			&proptags, 0, row_count, &rows))
+			mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
+		if (rows.count != 0){
+			// Conflict found, set the status and return
+			mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+			out_status = 1;
 		}
 		// No conflicts found
 		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
 	}
+	// 	for (size_t i = 0; i < rows.count; ++i) {
+
+	// 	if (!get_freebusy(dir, use_name, start, end, freebusyData))
+	// 	{
+	// 		mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
+	// 	}
+	// 	mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
+
+	// 	// Iterate through free/busy events and check for conflicts
+	// 	for (const freebusy_event &event : freebusyData)
+	// 	{
+	// 		mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
+	// 		auto event_start_time = event.start_time;
+	// 		auto event_end_time = event.end_time;
+
+	// 		bool is_recurring = event.details && event.details->is_recurring;
+	// 		mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
+	// 		// Check for overlap with existing appointments
+	// 		if ((event_start_time >= start && event_start_time <= end) ||
+	// 			(event_end_time >= start && event_end_time <= end) ||
+	// 			(event_start_time < start && event_end_time > end) ||
+	// 			(is_recurring && event_end_time >= start) ||
+	// 			(!is_recurring && event_start_time <= end))
+	// 		{
+	// 			// Conflict found, set the status and return
+	// 			mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+	// 			out_status = 1;
+	// 		}
+	// 	}
+	// 	// No conflicts found
+	// 	mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
+	// }
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
 
