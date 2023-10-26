@@ -880,6 +880,17 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
     return ecSuccess;
 }
 
+#define TIME_FIXUP_CONSTANT_INT				11644473600LL
+time_t rop_util_nttime_to_unixee(uint64_t nt_time)
+{
+	uint64_t unix_time;
+
+	unix_time = nt_time;
+	unix_time /= 10000000;
+	unix_time -= TIME_FIXUP_CONSTANT_INT;
+	return (time_t)unix_time;
+}
+
 static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy, bool *meetingresponse) {
 	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
 	TARRAY_SET *prcpts;
@@ -1051,7 +1062,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			// mlog(LV_ERR, "W-PREC: endwholes %u", start_wholes);
 
 			// Check for overlap with existing appointments
-			if ((start_nttime == rop_util_nttime_to_unix(*event_start_time)) && (end_nttime == rop_util_nttime_to_unix(*event_end_time)))
+			if ((start_nttime == rop_util_nttime_to_unixee(*event_start_time)) && (end_nttime == rop_util_nttime_to_unixee(*event_end_time)))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
