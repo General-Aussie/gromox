@@ -1048,9 +1048,10 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 			auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
 			auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
+			mlog(LV_ERR, "W-PREC: endwholes %u", *start_wholes);
 
 			// Check for overlap with existing appointments
-			if ((&start_nttime >= &start_wholes) && (&end_nttime <= &end_wholes))
+			if ((&start_nttime >= start_wholes) && (&end_nttime <= end_wholes))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
