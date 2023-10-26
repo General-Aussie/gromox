@@ -1051,7 +1051,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			// mlog(LV_ERR, "W-PREC: endwholes %u", start_wholes);
 
 			// Check for overlap with existing appointments
-			if ((start_nttime >= rop_util_nttime_to_unix(*event_start_time)) && (end_nttime <= rop_util_nttime_to_unix(*event_end_time)))
+			if ((start_nttime == rop_util_nttime_to_unix(*event_start_time)) && (end_nttime == rop_util_nttime_to_unix(*event_end_time)))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
