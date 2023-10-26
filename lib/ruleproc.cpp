@@ -1052,14 +1052,13 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			mlog(LV_ERR, "Unix time: %s", event_end_time_str);
 
 			// Check for overlap with existing appointments
-			if (((start_wholes >= start_whole) && (start_wholes <= end_whole)) ||
-				((end_wholes >= start_whole) && (end_wholes <= end_whole)) ||
-				((start_wholes < start_whole) && (end_wholes > end_whole)))
+			if ((start_wholes >= start_whole) && (start_wholes <= end_whole))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
 				out_status = 1;
 			}
+			mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
 		}
 
 		// No conflicts found
