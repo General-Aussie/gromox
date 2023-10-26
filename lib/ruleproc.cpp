@@ -952,8 +952,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "Start date and end date available: %s", par.cur.dir.c_str());
 		auto startt = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
 		auto endd = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
-		mlog(LV_ERR, "Start date: %lu", *start);
-		mlog(LV_ERR, "End date: %lu", *end);
+		mlog(LV_ERR, "Start date: %lu", *startt);
+		mlog(LV_ERR, "End date: %lu", *endd);
 		auto start_whole = rop_util_nttime_to_unix(*startt);
 		auto end_whole = rop_util_nttime_to_unix(*endd);
 		// Convert time_t to a string
@@ -972,7 +972,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: entering meeting overlap check %s", dir);
 		// Assume no conflict initially
-		*out_status = 0;
 
 		// Retrieve free/busy events within the specified time range
 		std::vector<freebusy_event> freebusyData;
@@ -983,7 +982,6 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		if (!get_freebusy(dir, use_name, start, end, freebusyData))
 		{
 			mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
-			return FALSE; // An error occurred while retrieving free/busy data.
 		}
 		mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
 
@@ -1006,13 +1004,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
 				*out_status = 1;
-				return TRUE;
 			}
 		}
 
 		// No conflicts found
 		mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
-		return FALSE;
 	}
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
