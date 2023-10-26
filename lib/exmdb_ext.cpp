@@ -2235,7 +2235,7 @@ static pack_result exmdb_push(EXT_PUSH &x, const exreq_autoreply_tsupdate &d)
 static pack_result exmdb_pull(EXT_PULL &x, exreq_appt_meetreq_overlap &d)
 {
 	uint8_t tmp_byte;
-	
+	TRY(x.g_str(&d.dir));
 	TRY(x.g_uint8(&tmp_byte));
 	if (tmp_byte == 0)
 		d.username = nullptr;
@@ -2247,6 +2247,7 @@ static pack_result exmdb_pull(EXT_PULL &x, exreq_appt_meetreq_overlap &d)
 
 static pack_result exmdb_push(EXT_PUSH &x, const exreq_appt_meetreq_overlap &d)
 {
+	TRY(x.p_str(d.dir));
 	if (d.username == nullptr) {
 		TRY(x.p_uint8(0));
 	} else {

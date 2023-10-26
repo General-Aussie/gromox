@@ -968,7 +968,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// auto startt = rop_util_unix_to_nttime(start_whole);
 		// auto endd = rop_util_unix_to_nttime(end_whole);
 		
-		if (!exmdb_client::appt_meetreq_overlap(dir, use_name, &start, &end, &out_status))
+		if (!exmdb_client::appt_meetreq_overlap(dir, use_name, start, end, &out_status))
 			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	}
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
