@@ -1012,20 +1012,36 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
 		for (size_t i = 0; i < rows.count; ++i) {
 			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
+			
+			// Get the start and end times from the content table
 			auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
 			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
-			// auto is_recurring = rows.pparray[i]->get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
-			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
+
+			// Convert event_start_time and event_end_time to strings in the same format as time_str
+			struct tm event_start_time_tm;
+			struct tm event_end_time_tm;
+			char event_start_time_str[64];
+			char event_end_time_str[64];
+
+			// Convert event_start_time to a string
+			localtime_r(&event_start_time, &event_start_time_tm);
+			strftime(event_start_time_str, sizeof(event_start_time_str), "%Y-%m-%d %H:%M:%S", &event_start_time_tm);
+
+			// Convert event_end_time to a string
+			localtime_r(&event_end_time, &event_end_time_tm);
+			strftime(event_end_time_str, sizeof(event_end_time_str), "%Y-%m-%d %H:%M:%S", &event_end_time_tm);
+
 			// Check for overlap with existing appointments
-			if ((event_start_time >= start && event_start_time <= end) ||
-				(event_end_time >= start && event_end_time <= end) ||
-				(event_start_time < start && event_end_time > end))
+			if ((strcmp(event_start_time_str, time_str) >= 0 && strcmp(event_start_time_str, time_str) <= 0) ||
+				(strcmp(event_end_time_str, time_str) >= 0 && strcmp(event_end_time_str, time_str) <= 0) ||
+				(strcmp(event_start_time_str, time_str) < 0 && strcmp(event_end_time_str, time_str) > 0))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
 				out_status = 1;
 			}
 		}
+
 		// No conflicts found
 		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
 	}
