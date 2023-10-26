@@ -3965,7 +3965,7 @@ BOOL exmdb_server::rule_new_message(const char *dir, const char *username,
  * Compares the meeting request indicated by @appt_mid whether it conflicts with any existing appointments in @fid.
  * @out_status will be filled with value 1 if there is a timeslot conflict between any appointment and the new meeting request.
  */
-BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t *start_time, uint64_t *end_time, uint32_t *out_status)
+BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t start_time, uint64_t end_time, uint32_t *out_status)
 {
 	mlog(LV_ERR, "W-PREC: entering meeting overlap check %s", dir);
     // Assume no conflict initially
