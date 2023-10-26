@@ -966,12 +966,12 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
 	if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
 		mlog(LV_ERR, "Start date and end date available: %s", par.cur.dir.c_str());
-		auto startt = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
-		auto endd = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
-		mlog(LV_ERR, "Start date: %lu", *startt);
-		mlog(LV_ERR, "End date: %lu", *endd);
-		auto start_whole = rop_util_nttime_to_unix(*startt);
-		auto end_whole = rop_util_nttime_to_unix(*endd);
+		auto start = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
+		auto end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
+		mlog(LV_ERR, "Start date: %lu", *start);
+		mlog(LV_ERR, "End date: %lu", *end);
+		auto start_whole = rop_util_nttime_to_unix(*start);
+		auto end_whole = rop_util_nttime_to_unix(*end);
 		// Convert time_t to a string
 		char time_str[64];  // Adjust the buffer size as needed
 		struct tm timeinfo;
@@ -989,15 +989,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: entering meeting overlap check %s", dir);
 		// Assume no conflict initially
 
-		// Retrieve free/busy events within the specified time range
-		std::vector<freebusy_event> freebusyData;
-		mlog(LV_ERR, "W-PREC: created freebusy vector %s", dir);
-		auto start = rop_util_nttime_to_unix(start_whole);
-		auto end = rop_util_nttime_to_unix(end_whole);
-
 		/* C1: apptstartwhole <= start && apptendwhole >= end */
-		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &startt}};
-		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, apptendwhole, {apptendwhole, &endd}};
+		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &start}};
+		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, apptendwhole, {apptendwhole, &end}};
 		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 		RESTRICTION rst_6          = {RES_OR, {&rst_4}};
