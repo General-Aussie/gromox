@@ -1002,13 +1002,12 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 				(!is_recurring && event_start_time <= end))
 			{
 				// Conflict found, set the status and return
-				mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
-				*out_status = 1;
+				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+				out_status = 1;
 			}
 		}
-
 		// No conflicts found
-		mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
+		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
 	}
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
