@@ -1305,7 +1305,7 @@ struct exresp_autoreply_tsquery : public exresp {
 };
 
 struct exresp_appt_meetreq_overlap : public exresp {
-	uint32_t *out_status;
+	uint32_t out_status;
 };
 
 using exreq_ping_store = exreq;
