@@ -990,8 +990,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto end = rop_util_nttime_to_unix(end_whole);
 
 		/* C1: apptstartwhole <= start && apptendwhole >= end */
-		RESTRICTION_PROPERTY rst_1 = {RELOP_LE, PR_START_DATE, {PR_START_DATE, &startt}};
-		RESTRICTION_PROPERTY rst_2 = {RELOP_GE, PR_END_DATE, {PR_END_DATE, &endd}};
+		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, PR_START_DATE, {PR_START_DATE, &startt}};
+		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, PR_END_DATE, {PR_END_DATE, &endd}};
 		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 		RESTRICTION rst_6          = {RES_OR, {&rst_4}};
@@ -1013,8 +1013,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
 		if (rows.count != 0){
 			// Conflict found, set the status and return
-			mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
 			out_status = 1;
+			mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
 		}
 		// No conflicts found
 		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
