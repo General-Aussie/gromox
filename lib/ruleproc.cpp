@@ -1018,23 +1018,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		RESTRICTION rst_11[2]       = {{RES_PROPERTY, {&rst_9}}, {RES_PROPERTY, {&rst_10}}};
 		RESTRICTION_AND_OR rst_12   = {std::size(rst_11), rst_11};
 
-		/* C4: have(clipend) && recurring && clipend >= start */
-		RESTRICTION_EXIST rst_13    = {ptag.clipend};
-		RESTRICTION_PROPERTY rst_14 = {RELOP_EQ, recc, {recc, deconst(&fixed_true)}};
-		RESTRICTION_PROPERTY rst_15 = {RELOP_GE, clipend, {clipend, &start_nttime}};
-		RESTRICTION rst_16[3]       = {{RES_EXIST, {&rst_13}}, {RES_PROPERTY, {&rst_14}}, {RES_PROPERTY, {&rst_15}}};
-		RESTRICTION_AND_OR rst_17   = {std::size(rst_16), rst_16};
-
-		/* C5: !have(clipend) && recurring && apptstartwhole <= end */
-		RESTRICTION_EXIST rst_18    = {ptag.clipend};
-		RESTRICTION rst_19          = {RES_EXIST, {&rst_18}};
-		RESTRICTION_PROPERTY rst_20 = {RELOP_EQ, recc, {recc, deconst(&fixed_true)}};
-		RESTRICTION_PROPERTY rst_21 = {RELOP_LE, apptstartwhole, {apptstartwhole, &end_nttime}};
-		RESTRICTION rst_22[3]       = {{RES_NOT, {&rst_19}}, {RES_PROPERTY, {&rst_20}}, {RES_PROPERTY, {&rst_21}}};
-		RESTRICTION_AND_OR rst_23   = {std::size(rst_22), rst_22};
-
 		/* OR over C1-C5 */
-		RESTRICTION rst_24[5]       = {{RES_AND, {&rst_4}}, {RES_AND, {&rst_8}}, {RES_AND, {&rst_12}}, {RES_AND, {&rst_17}}, {RES_AND, {&rst_23}}};
+		RESTRICTION rst_24[5]       = {{RES_AND, {&rst_4}}, {RES_AND, {&rst_8}}, {RES_AND, {&rst_12}}};
 		RESTRICTION_AND_OR rst_25   = {std::size(rst_24), rst_24};
 		RESTRICTION rst_26          = {RES_OR, {&rst_25}};
 
