@@ -96,6 +96,11 @@ struct rxparam {
 	bool del = false, exit = false;
 };
 
+struct PropertyValuePair {
+	unsigned int proptag;
+	const void* value;
+};
+
 using message_content_ptr = std::unique_ptr<MESSAGE_CONTENT, rx_delete>;
 
 }
@@ -942,22 +947,31 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto busy_stat = PROP_TAG(PT_LONG, propids.ppropid[2]);
 	
 	uint32_t out_status = 0;
-	// mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
-	// if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
-	// 	auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
-	// 	auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
-	// 	mlog(LV_ERR, "Start date: %lu", *start);
-	// 	mlog(LV_ERR, "End date: %lu", *end);
-	// 	auto start_whole = rop_util_nttime_to_unix(*start);
-	// 	auto end_whole = rop_util_nttime_to_unix(*end);
-	// 	auto startt = rop_util_unix_to_nttime(start_whole);
-	// 	auto endd = rop_util_unix_to_nttime(end_whole);
+	mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
+	if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
+		mlog(LV_ERR, "Start date and end date available: %s", par.cur.dir.c_str());
+		auto start = par.ctnt->proplist.get<const uint64_t>(PR_START_DATE);
+		auto end = par.ctnt->proplist.get<const uint64_t>(PR_END_DATE);
+		mlog(LV_ERR, "Start date: %lu", *start);
+		mlog(LV_ERR, "End date: %lu", *end);
+		auto start_whole = rop_util_nttime_to_unix(*start);
+		auto end_whole = rop_util_nttime_to_unix(*end);
 		
-	// 	if (!exmdb_client::appt_meetreq_overlap(dir, use_name, startt, endd, &out_status)){
-	// 		snprintf(buffer, sizeof(buffer), "Meeting overlap error");
-	// 		mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
-	// 	}
-	// }
+		// Convert time_t to a string
+		char time_str[64];  // Adjust the buffer size as needed
+		struct tm timeinfo;
+		localtime_r(&start_whole, &timeinfo);
+		strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &timeinfo);
+
+		// Log the formatted time string
+		mlog(LV_ERR, "Unix time: %s", time_str);
+
+		// auto startt = rop_util_unix_to_nttime(start_whole);
+		// auto endd = rop_util_unix_to_nttime(end_whole);
+		
+		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, start_whole, end_whole, &out_status))
+		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
+	}
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
 
@@ -972,11 +986,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecError;
 	
 	auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
-	// auto recurrpatt = par.ctnt->proplist.get(PROP_TAG(PT_UNICODE, propids.ppropid[6]));
-	auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[7]));
-	auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]));
-	auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[9]));
-	auto finvited = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]));
+	// // auto recurrpatt = par.ctnt->proplist.get(PROP_TAG(PT_UNICODE, propids.ppropid[6]));
+	// auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[7]));
+	// auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]));
+	// auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[9]));
+	// auto finvited = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]));
 
 	bool isEquipmentMailbox = false;
 	bool isRoomMailbox = false;
@@ -986,6 +1000,37 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		return res_err;
 		mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
 	}
+
+	// if (props_new.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
+	// 	return ecError;
+	// if (props_new.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
+	// 	return ecError;
+	// if (props_new.set(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), &recurring) != 0)
+	// 	return ecError;
+	// if (props_new.set(PROP_TAG(PT_LONG, propids.ppropid[7]), &stateflag) != 0)
+	// 	return ecError;
+	// if (props_new.set(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]), &subtype) != 0)
+	// 	return ecError;
+	// if (props_new.set(PROP_TAG(PT_LONG, propids.ppropid[9]), &meetingtype) != 0)
+	// 	return ecError;
+	// if (props_new.set(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]), &finvited) != 0)
+	// 	return ecError;
+
+	PropertyValuePair propertiesToSet[] = {
+		{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
+		{PR_MESSAGE_CLASS, "IPM.Appointment"},
+		{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]))},
+		{PROP_TAG(PT_LONG, propids.ppropid[7]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[7]))},
+		{PROP_TAG(PT_BOOLEAN, propids.ppropid[8]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]))},
+		{PROP_TAG(PT_LONG, propids.ppropid[9]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[9]))},
+		{PROP_TAG(PT_BOOLEAN, propids.ppropid[10]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]))},
+	};
+
+	for (const auto& prop : propertiesToSet) {
+		if (props_new.set(prop.proptag, prop.value) != 0) {
+			return ecError;
+		}
+	}	
 
     if (isRoomMailbox || isEquipmentMailbox) {
 		mlog(LV_ERR, "W-PREC: entering if statement %s", par.cur.dir.c_str());
