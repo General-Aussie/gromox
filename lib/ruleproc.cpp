@@ -990,10 +990,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// Assume no conflict initially
 
 		/* C1: apptstartwhole <= start && apptendwhole >= end */
-		RESTRICTION_PROPERTY rst_1 = {RELOP_EQ, PR_START_DATE, {PR_START_DATE, &start}};
-		RESTRICTION_PROPERTY rst_2 = {RELOP_EQ, PR_END_DATE, {PR_END_DATE, &end}};
 		RESTRICTION_PROPERTY rst_7 = {RELOP_EQ, busy_stat, {busy_stat, &busy}};
-		RESTRICTION rst_3[3]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}, {RES_PROPERTY, {&rst_7}}};
+		RESTRICTION rst_3[1]       = {{RES_PROPERTY, {&rst_7}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 		RESTRICTION rst_6          = {RES_AND, {&rst_4}};
 
@@ -1016,14 +1014,12 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
 			auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
 			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
-			auto is_recurring = rows.pparray[i]->get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+			// auto is_recurring = rows.pparray[i]->get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
 			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
 			// Check for overlap with existing appointments
 			if ((event_start_time >= start && event_start_time <= end) ||
 				(event_end_time >= start && event_end_time <= end) ||
-				(event_start_time < start && event_end_time > end) ||
-				(is_recurring && event_end_time >= start) ||
-				(!is_recurring && event_start_time <= end))
+				(event_start_time < start && event_end_time > end))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
