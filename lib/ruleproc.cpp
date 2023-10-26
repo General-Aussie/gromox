@@ -989,8 +989,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		for (const freebusy_event &event : freebusyData)
 		{
 			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
-			time_t event_start_time = event.start_time;
-			time_t event_end_time = event.end_time;
+			auto event_start_time = event.start_time;
+			auto event_end_time = event.end_time;
 
 			bool is_recurring = event.details && event.details->is_recurring;
 			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
