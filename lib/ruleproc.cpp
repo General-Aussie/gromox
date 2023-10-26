@@ -950,8 +950,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	mlog(LV_ERR, "W-PREC: check for start date and end date %s", par.cur.dir.c_str());	
 	if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
 		mlog(LV_ERR, "Start date and end date available: %s", par.cur.dir.c_str());
-		uint64_t start = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
-		uint64_t end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
+		auto start = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
+		auto end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
 		mlog(LV_ERR, "Start date: %lu", *start);
 		mlog(LV_ERR, "End date: %lu", *end);
 		auto start_whole = rop_util_nttime_to_unix(*start);
@@ -968,7 +968,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// auto startt = rop_util_unix_to_nttime(start_whole);
 		// auto endd = rop_util_unix_to_nttime(end_whole);
 		
-		if (!exmdb_client::appt_meetreq_overlap(dir, use_name, start, end, &out_status))
+		if (!exmdb_client::appt_meetreq_overlap(dir, use_name, &start, &end, &out_status))
 			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	}
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
