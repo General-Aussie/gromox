@@ -1017,6 +1017,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
 			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
 
+			auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
+			auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
+
 			// Convert event_start_time and event_end_time to strings in the same format as time_str
 			struct tm event_start_time_tm;
 			struct tm event_end_time_tm;
@@ -1024,11 +1027,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			char event_end_time_str[64];
 
 			// Convert event_start_time to a string
-			localtime_r(&event_start_time, &event_start_time_tm);
+			localtime_r(&start_wholes, &event_start_time_tm);
 			strftime(event_start_time_str, sizeof(event_start_time_str), "%Y-%m-%d %H:%M:%S", &event_start_time_tm);
 
 			// Convert event_end_time to a string
-			localtime_r(&event_end_time, &event_end_time_tm);
+			localtime_r(&end_wholes, &event_end_time_tm);
 			strftime(event_end_time_str, sizeof(event_end_time_str), "%Y-%m-%d %H:%M:%S", &event_end_time_tm);
 
 			// Check for overlap with existing appointments
