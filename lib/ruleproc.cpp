@@ -1002,7 +1002,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 		/* C1: apptstartwhole >= start && apptstartwhole <= end */
 		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &start_nttime}};
-		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, apptstartwhole, {apptstartwhole, &end_nttime}};
+		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, apptendwhole, {apptendwhole, &end_nttime}};
 		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 
