@@ -1009,30 +1009,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: entering meeting overlap check %s", dir);
 		// Assume no conflict initially
 
-		static constexpr uint8_t fixed_true = 1;
-
 		/* C1: apptstartwhole >= start && apptstartwhole <= end */
 		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &start_nttime}};
 		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, apptendwhole, {apptendwhole, &end_nttime}};
 		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
-
-		// /* C2: apptendwhole >= start && apptendwhole <= end */
-		// RESTRICTION_PROPERTY rst_5 = {RELOP_GE, apptendwhole, {apptendwhole, &start_nttime}};
-		// RESTRICTION_PROPERTY rst_6 = {RELOP_LE, apptendwhole, {apptendwhole, &end_nttime}};
-		// RESTRICTION rst_7[2]       = {{RES_PROPERTY, {&rst_5}}, {RES_PROPERTY, {&rst_6}}};
-		// RESTRICTION_AND_OR rst_8   = {std::size(rst_7), rst_7};
-
-		// /* C3: apptstartwhole < start && apptendwhole > end */
-		// RESTRICTION_PROPERTY rst_9  = {RELOP_LT, apptstartwhole, {apptstartwhole, &start_nttime}};
-		// RESTRICTION_PROPERTY rst_10 = {RELOP_GT, apptendwhole, {apptendwhole, &end_nttime}};
-		// RESTRICTION rst_11[2]       = {{RES_PROPERTY, {&rst_9}}, {RES_PROPERTY, {&rst_10}}};
-		// RESTRICTION_AND_OR rst_12   = {std::size(rst_11), rst_11};
-
-		/* OR over C1-C5 */
-		// RESTRICTION rst_24[1]       = {{RES_AND, {&rst_4}}};
-		// RESTRICTION_AND_OR rst_25   = {std::size(rst_24), rst_24};
 		RESTRICTION rst_26          = {RES_OR, {&rst_4}};
+
+		std::vector<TimePair> appointmentTimes; // Vector to store pairs of start and end times
 
 		uint32_t table_id = 0, row_count = 0;
 		if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr,
@@ -1054,26 +1038,39 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
 			
 			// // Get the start and end times from the content table
-			auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
+			auto event_start_time = rows.pparray[i]->get<uint64_t>(PR_START_DATE);
 			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
-			mlog(LV_ERR, "W-PREC: checked %s", dir);
-			// auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
-			// auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
-			// mlog(LV_ERR, "W-PREC: endwholes %u", start_wholes);
 
-			// Check for overlap with existing appointments
-			if ((start_nttime == rop_util_nttime_to_unixee(*event_start_time)) && (end_nttime == rop_util_nttime_to_unixee(*event_end_time)))
+			appointmentTimes.push_back(std::make_pair(event_start_time, event_end_time));
+
+			mlog(LV_ERR, "W-PREC: checked %s", dir);
+			if ((start_nttime >= rop_util_nttime_to_unixee(*event_start_time)) && (end_nttime <= rop_util_nttime_to_unixee(*event_end_time)))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
 				out_status = 1;
 			}
 			mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
+
+			// Add the pair of start and end times to the vector
+			
 		}
 
 		// No conflicts found
 		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
 	}
+	// auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
+			// auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
+			// mlog(LV_ERR, "W-PREC: endwholes %u", start_wholes);
+
+			// // Check for overlap with existing appointments
+			// if ((start_nttime == rop_util_nttime_to_unixee(*event_start_time)) && (end_nttime == rop_util_nttime_to_unixee(*event_end_time)))
+			// {
+			// 	// Conflict found, set the status and return
+			// 	mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+			// 	out_status = 1;
+			// }
+			// mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
 	// 	for (size_t i = 0; i < rows.count; ++i) {
 
 	// 	if (!get_freebusy(dir, use_name, start, end, freebusyData))
