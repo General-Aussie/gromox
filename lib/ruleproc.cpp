@@ -1016,7 +1016,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 		RESTRICTION rst_26          = {RES_OR, {&rst_4}};
 
-		std::vector<TimePair> appointmentTimes; // Vector to store pairs of start and end times
+		// std::vector<time_str> appointmentTimes; // Vector to store pairs of start and end times
 
 		uint32_t table_id = 0, row_count = 0;
 		if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr,
@@ -1041,7 +1041,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			auto event_start_time = rows.pparray[i]->get<uint64_t>(PR_START_DATE);
 			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
 
-			appointmentTimes.push_back(std::make_pair(event_start_time, event_end_time));
+			// appointmentTimes.push_back(std::make_pair(event_start_time, event_end_time));
 
 			mlog(LV_ERR, "W-PREC: checked %s", dir);
 			if ((start_nttime >= rop_util_nttime_to_unixee(*event_start_time)) && (end_nttime <= rop_util_nttime_to_unixee(*event_end_time)))
