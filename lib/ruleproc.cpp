@@ -1151,6 +1151,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 					{PROP_TAG(PT_BOOLEAN, propids.ppropid[8]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]))},
 					{PROP_TAG(PT_LONG, propids.ppropid[9]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[9]))},
 					{PROP_TAG(PT_BOOLEAN, propids.ppropid[10]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]))},
+					{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
 				};
 
 				for (const auto& prop : propertiesToSet) {
