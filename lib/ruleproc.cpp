@@ -1043,14 +1043,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
 			
 			// // Get the start and end times from the content table
-			// auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
-			// auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
+			auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
+			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
 
-			// auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
-			// auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
+			auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
+			auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
 
 			// Check for overlap with existing appointments
-			if ((apptstartwhole >= start_nttime) && (apptendwhole <= end_nttime))
+			if ((&start_nttime >= &start_wholes) && (&end_nttime <= &end_wholes))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
