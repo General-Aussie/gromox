@@ -3965,7 +3965,7 @@ BOOL exmdb_server::rule_new_message(const char *dir, const char *username,
  * Compares the meeting request indicated by @appt_mid whether it conflicts with any existing appointments in @fid.
  * @out_status will be filled with value 1 if there is a timeslot conflict between any appointment and the new meeting request.
  */
-ec_error_t exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t *start_time, uint64_t *end_time, uint32_t *out_status)
+BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t *start_time, uint64_t *end_time, uint32_t *out_status)
 {
 	mlog(LV_ERR, "W-PREC: entering meeting overlap check %s", dir);
     // Assume no conflict initially
@@ -3974,8 +3974,8 @@ ec_error_t exmdb_server::appt_meetreq_overlap(const char *dir, const char *usern
     // Retrieve free/busy events within the specified time range
     std::vector<freebusy_event> freebusyData;
 	mlog(LV_ERR, "W-PREC: created freebusy vector %s", dir);
-	auto start = rop_util_nttime_to_unix(start_time);
-	auto end = rop_util_nttime_to_unix(end_time);
+	auto start = rop_util_nttime_to_unix(*start_time);
+	auto end = rop_util_nttime_to_unix(*end_time);
 
     if (!get_freebusy(dir, username, start, end, freebusyData))
     {
@@ -3988,8 +3988,8 @@ ec_error_t exmdb_server::appt_meetreq_overlap(const char *dir, const char *usern
     for (const freebusy_event &event : freebusyData)
     {
 		mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
-        time_t event_start_time = event.start_time;
-        time_t event_end_time = event.end_time;
+        auto event_start_time = event.start_time;
+        auto event_end_time = event.end_time;
 
         bool is_recurring = event.details && event.details->is_recurring;
 		mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
