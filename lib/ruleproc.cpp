@@ -995,7 +995,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		RESTRICTION_PROPERTY rst_7 = {RELOP_EQ, busy_stat, {busy_stat, &busy}};
 		RESTRICTION rst_3[3]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}, {RES_PROPERTY, {&rst_7}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
-		RESTRICTION rst_6          = {RES_OR, {&rst_4}};
+		RESTRICTION rst_6          = {RES_AND, {&rst_4}};
 
 		uint32_t table_id = 0, row_count = 0;
 		if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_6, nullptr, &table_id, &row_count))
