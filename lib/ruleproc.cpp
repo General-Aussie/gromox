@@ -947,11 +947,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	uint32_t permission = 0;
 	auto cal_eid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
 
-	if (username != nullptr) {
+	if (use_name != nullptr) {
 		if (!exmdb_client::get_folder_perm(dir, cal_eid, use_name, &permission))
-			return false;
+			mlog(LV_ERR, "cannot get folder perm: %s", par.cur.dir.c_str());
 		if (!(permission & (frightsFreeBusySimple | frightsFreeBusyDetailed | frightsReadAny)))
-			return false;
+			mlog(LV_ERR, "Cannot get folder perm : %s", par.cur.dir.c_str());
 	} else {
 		permission = frightsFreeBusyDetailed | frightsReadAny;
 	}
