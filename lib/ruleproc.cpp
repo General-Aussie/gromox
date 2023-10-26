@@ -1006,22 +1006,22 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 
-		/* C2: apptendwhole >= start && apptendwhole <= end */
-		RESTRICTION_PROPERTY rst_5 = {RELOP_GE, apptendwhole, {apptendwhole, &start_nttime}};
-		RESTRICTION_PROPERTY rst_6 = {RELOP_LE, apptendwhole, {apptendwhole, &end_nttime}};
-		RESTRICTION rst_7[2]       = {{RES_PROPERTY, {&rst_5}}, {RES_PROPERTY, {&rst_6}}};
-		RESTRICTION_AND_OR rst_8   = {std::size(rst_7), rst_7};
+		// /* C2: apptendwhole >= start && apptendwhole <= end */
+		// RESTRICTION_PROPERTY rst_5 = {RELOP_GE, apptendwhole, {apptendwhole, &start_nttime}};
+		// RESTRICTION_PROPERTY rst_6 = {RELOP_LE, apptendwhole, {apptendwhole, &end_nttime}};
+		// RESTRICTION rst_7[2]       = {{RES_PROPERTY, {&rst_5}}, {RES_PROPERTY, {&rst_6}}};
+		// RESTRICTION_AND_OR rst_8   = {std::size(rst_7), rst_7};
 
-		/* C3: apptstartwhole < start && apptendwhole > end */
-		RESTRICTION_PROPERTY rst_9  = {RELOP_LT, apptstartwhole, {apptstartwhole, &start_nttime}};
-		RESTRICTION_PROPERTY rst_10 = {RELOP_GT, apptendwhole, {apptendwhole, &end_nttime}};
-		RESTRICTION rst_11[2]       = {{RES_PROPERTY, {&rst_9}}, {RES_PROPERTY, {&rst_10}}};
-		RESTRICTION_AND_OR rst_12   = {std::size(rst_11), rst_11};
+		// /* C3: apptstartwhole < start && apptendwhole > end */
+		// RESTRICTION_PROPERTY rst_9  = {RELOP_LT, apptstartwhole, {apptstartwhole, &start_nttime}};
+		// RESTRICTION_PROPERTY rst_10 = {RELOP_GT, apptendwhole, {apptendwhole, &end_nttime}};
+		// RESTRICTION rst_11[2]       = {{RES_PROPERTY, {&rst_9}}, {RES_PROPERTY, {&rst_10}}};
+		// RESTRICTION_AND_OR rst_12   = {std::size(rst_11), rst_11};
 
 		/* OR over C1-C5 */
-		RESTRICTION rst_24[3]       = {{RES_AND, {&rst_4}}, {RES_AND, {&rst_8}}, {RES_AND, {&rst_12}}};
-		RESTRICTION_AND_OR rst_25   = {std::size(rst_24), rst_24};
-		RESTRICTION rst_26          = {RES_OR, {&rst_25}};
+		// RESTRICTION rst_24[1]       = {{RES_AND, {&rst_4}}};
+		// RESTRICTION_AND_OR rst_25   = {std::size(rst_24), rst_24};
+		RESTRICTION rst_26          = {RES_OR, {&rst_4}};
 
 		uint32_t table_id = 0, row_count = 0;
 		if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr,
