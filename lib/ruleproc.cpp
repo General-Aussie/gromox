@@ -1044,15 +1044,17 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			// Convert event_start_time to a string
 			localtime_r(&start_wholes, &event_start_time_tm);
 			strftime(event_start_time_str, sizeof(event_start_time_str), "%Y-%m-%d %H:%M:%S", &event_start_time_tm);
+			mlog(LV_ERR, "Unix time: %s", event_start_time_str);
 
 			// Convert event_end_time to a string
 			localtime_r(&end_wholes, &event_end_time_tm);
 			strftime(event_end_time_str, sizeof(event_end_time_str), "%Y-%m-%d %H:%M:%S", &event_end_time_tm);
+			mlog(LV_ERR, "Unix time: %s", event_end_time_str);
 
 			// Check for overlap with existing appointments
-			if ((strcmp(event_start_time_str, time_str) >= 0 && strcmp(event_start_time_str, time_str2) <= 0) ||
-				(strcmp(event_end_time_str, time_str) >= 0 && strcmp(event_end_time_str, time_str2) <= 0) ||
-				(strcmp(event_start_time_str, time_str) < 0 && strcmp(event_end_time_str, time_str2) > 0))
+			if ((start_wholes >= start_whole && start_wholes <= end_whole) ||
+				(end_wholes >= start_whole) && (end_wholes <= end_whole) ||
+				((start_wholes < start) && (end_wholes > end_whole)))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
