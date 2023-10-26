@@ -1009,7 +1009,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
 
 		uint32_t proptag_buff[] = {
-			PR_ENTRYID, PR_START_DATE, PR_END_DATE,
+			PR_ENTRYID, apptstartwhole, apptstartwhole, PR_START_DATE, PR_END_DATE,
 		};
 		const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 		TARRAY_SET rows;
@@ -1017,10 +1017,23 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			&proptags, 0, row_count, &rows))
 			mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
-		if (rows.count != 0){
-			// Conflict found, set the status and return
-			out_status = 1;
-			mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+		for (size_t i = 0; i < rows.count; ++i) {
+			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
+			auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
+			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
+			auto is_recurring = rows.pparray[i]->get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
+			// Check for overlap with existing appointments
+			if ((event_start_time >= start && event_start_time <= end) ||
+				(event_end_time >= start && event_end_time <= end) ||
+				(event_start_time < start && event_end_time > end) ||
+				(is_recurring && event_end_time >= start) ||
+				(!is_recurring && event_start_time <= end))
+			{
+				// Conflict found, set the status and return
+				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+				out_status = 1;
+			}
 		}
 		// No conflicts found
 		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
@@ -1140,6 +1153,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 						if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 							return ecError;
 						mlog(LV_INFO, "Declined due to conflict.\n");
+						return ecSuccess;
 					}   
 				}
 
