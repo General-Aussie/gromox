@@ -880,17 +880,6 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
     return ecSuccess;
 }
 
-#define TIME_FIXUP_CONSTANT_INT				11644473600LL
-time_t rop_util_nttime_to_unixee(uint64_t nt_time)
-{
-	uint64_t unix_time;
-
-	unix_time = nt_time;
-	unix_time /= 10000000;
-	unix_time -= TIME_FIXUP_CONSTANT_INT;
-	return (time_t)unix_time;
-}
-
 static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy, bool *meetingresponse) {
 	mlog(LV_ERR, "W-PREC: process meeting request starts here %s", par.cur.dir.c_str());
 	TARRAY_SET *prcpts;
@@ -983,7 +972,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "Start date: %lu", *start);
 		mlog(LV_ERR, "End date: %lu", *end);
 		auto start_nttime = rop_util_nttime_to_unix(*start);
+		mlog(LV_ERR, "W-PREC: endwholes %u", start_nttime);
 		auto end_nttime = rop_util_nttime_to_unix(*end);
+		mlog(LV_ERR, "W-PREC: endwholes %u", end_nttime);
 		// Convert time_t to a string
 		char time_str[64];  // Adjust the buffer size as needed
 		struct tm timeinfo;
@@ -1040,16 +1031,20 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			// // Get the start and end times from the content table
 			auto event_start_time = rows.pparray[i]->get<uint64_t>(PR_START_DATE);
 			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
+			auto nntime = rop_util_nttime_to_unix(*event_start_time);
+			mlog(LV_ERR, "W-PREC: startwholes %u", nntime);
+			auto ntime = rop_util_nttime_to_unix(*event_end_time);
+			mlog(LV_ERR, "W-PREC: endwholes %u", ntime);
 
 			// appointmentTimes.push_back(std::make_pair(event_start_time, event_end_time));
 
 			mlog(LV_ERR, "W-PREC: checked %s", dir);
-			if ((start_nttime >= rop_util_nttime_to_unixee(*event_start_time)) && (end_nttime <= rop_util_nttime_to_unixee(*event_end_time)))
-			{
-				// Conflict found, set the status and return
-				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
-				out_status = 1;
-			}
+			// if ((start_nttime >= ) && (end_nttime <= rop_util_nttime_to_unixee(*event_end_time)))
+			// {
+			// 	// Conflict found, set the status and return
+			// 	mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+			// 	out_status = 1;
+			// }
 			mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
 
 			// Add the pair of start and end times to the vector
