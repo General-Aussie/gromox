@@ -1021,7 +1021,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		/* OR over C1-C5 */
 		// RESTRICTION rst_24[1]       = {{RES_AND, {&rst_4}}};
 		// RESTRICTION_AND_OR rst_25   = {std::size(rst_24), rst_24};
-		RESTRICTION rst_26          = {RES_OR, {&rst_4}};
+		RESTRICTION rst_26          = {RES_AND, {&rst_4}};
 
 		uint32_t table_id = 0, row_count = 0;
 		if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr,
