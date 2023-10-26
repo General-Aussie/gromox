@@ -968,8 +968,51 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// auto startt = rop_util_unix_to_nttime(start_whole);
 		// auto endd = rop_util_unix_to_nttime(end_whole);
 		
-		if (!exmdb_client::appt_meetreq_overlap(dir, use_name, *start, *end, &out_status))
-			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
+		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, *start, *end, &out_status))
+		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
+		mlog(LV_ERR, "W-PREC: entering meeting overlap check %s", dir);
+		// Assume no conflict initially
+		*out_status = 0;
+
+		// Retrieve free/busy events within the specified time range
+		std::vector<freebusy_event> freebusyData;
+		mlog(LV_ERR, "W-PREC: created freebusy vector %s", dir);
+		auto start = rop_util_nttime_to_unix(start_whole);
+		auto end = rop_util_nttime_to_unix(end_whole);
+
+		if (!get_freebusy(dir, use_name, start, end, freebusyData))
+		{
+			mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
+			return FALSE; // An error occurred while retrieving free/busy data.
+		}
+		mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
+
+		// Iterate through free/busy events and check for conflicts
+		for (const freebusy_event &event : freebusyData)
+		{
+			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
+			time_t event_start_time = event.start_time;
+			time_t event_end_time = event.end_time;
+
+			bool is_recurring = event.details && event.details->is_recurring;
+			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
+			// Check for overlap with existing appointments
+			if ((event_start_time >= start && event_start_time <= end) ||
+				(event_end_time >= start && event_end_time <= end) ||
+				(event_start_time < start && event_end_time > end) ||
+				(is_recurring && event_end_time >= start) ||
+				(!is_recurring && event_start_time <= end))
+			{
+				// Conflict found, set the status and return
+				mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
+				*out_status = 1;
+				return TRUE;
+			}
+		}
+
+		// No conflicts found
+		mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
+		return FALSE;
 	}
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
