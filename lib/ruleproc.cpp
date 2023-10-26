@@ -981,6 +981,14 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// Log the formatted time string
 		mlog(LV_ERR, "Unix time: %s", time_str);
 
+		char time_str2[64];  // Adjust the buffer size as needed
+		struct tm timeinfo2;
+		localtime_r(&end_whole, &timeinfo2);
+		strftime(time_str2, sizeof(time_str2), "%Y-%m-%d %H:%M:%S", &timeinfo2);
+
+		// Log the formatted time string
+		mlog(LV_ERR, "Unix time: %s", time_str2);
+
 		// auto startt = rop_util_unix_to_nttime(start_whole);
 		// auto endd = rop_util_unix_to_nttime(end_whole);
 		
@@ -994,6 +1002,13 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		RESTRICTION rst_3[1]       = {{RES_PROPERTY, {&rst_7}}};
 		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
 		RESTRICTION rst_6          = {RES_AND, {&rst_4}};
+
+		// /* C1: apptstartwhole >= start && apptstartwhole <= end */
+		// RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &start_whole}};
+		// RESTRICTION_PROPERTY rst_2 = {RELOP_LE, ptag.apptstartwhole, {ptag.apptstartwhole, &end_whole}};
+		// RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
+		// RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
+		// RESTRICTION rst_6          = {RES_AND, {&rst_4}};
 
 		uint32_t table_id = 0, row_count = 0;
 		if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_6, nullptr, &table_id, &row_count))
@@ -1035,9 +1050,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			strftime(event_end_time_str, sizeof(event_end_time_str), "%Y-%m-%d %H:%M:%S", &event_end_time_tm);
 
 			// Check for overlap with existing appointments
-			if ((strcmp(event_start_time_str, time_str) >= 0 && strcmp(event_start_time_str, time_str) <= 0) ||
-				(strcmp(event_end_time_str, time_str) >= 0 && strcmp(event_end_time_str, time_str) <= 0) ||
-				(strcmp(event_start_time_str, time_str) < 0 && strcmp(event_end_time_str, time_str) > 0))
+			if ((strcmp(event_start_time_str, time_str) >= 0 && strcmp(event_start_time_str, time_str2) <= 0) ||
+				(strcmp(event_end_time_str, time_str) >= 0 && strcmp(event_end_time_str, time_str2) <= 0) ||
+				(strcmp(event_start_time_str, time_str) < 0 && strcmp(event_end_time_str, time_str2) > 0))
 			{
 				// Conflict found, set the status and return
 				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
