@@ -949,6 +949,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto apptstartwhole = PROP_TAG(PT_SYSTIME, propids.ppropid[11]);
 	auto apptendwhole   = PROP_TAG(PT_SYSTIME, propids.ppropid[12]);
 	auto clipend = PROP_TAG(PT_SYSTIME, propids.ppropid[13]);
+	auto recc = PROP_TAG(PT_BOOLEAN, propids.ppropid[0]);
 
 	uint32_t permission = 0;
 	auto cal_eid = rop_util_make_eid_ex(1, PRIVATE_FID_CALENDAR);
@@ -970,12 +971,12 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		auto end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
 		mlog(LV_ERR, "Start date: %lu", *start);
 		mlog(LV_ERR, "End date: %lu", *end);
-		auto start_whole = rop_util_nttime_to_unix(*start);
-		auto end_whole = rop_util_nttime_to_unix(*end);
+		auto start_nttime = rop_util_nttime_to_unix(*start);
+		auto end_nttime = rop_util_nttime_to_unix(*end);
 		// Convert time_t to a string
 		char time_str[64];  // Adjust the buffer size as needed
 		struct tm timeinfo;
-		localtime_r(&start_whole, &timeinfo);
+		localtime_r(&start_nttime, &timeinfo);
 		strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &timeinfo);
 
 		// Log the formatted time string
@@ -983,7 +984,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 		char time_str2[64];  // Adjust the buffer size as needed
 		struct tm timeinfo2;
-		localtime_r(&end_whole, &timeinfo2);
+		localtime_r(&end_nttime, &timeinfo2);
 		strftime(time_str2, sizeof(time_str2), "%Y-%m-%d %H:%M:%S", &timeinfo2);
 
 		// Log the formatted time string
@@ -997,25 +998,52 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		mlog(LV_ERR, "W-PREC: entering meeting overlap check %s", dir);
 		// Assume no conflict initially
 
-		/* C1: apptstartwhole <= start && apptendwhole >= end */
-		RESTRICTION_PROPERTY rst_7 = {RELOP_EQ, busy_stat, {busy_stat, &busy}};
-		RESTRICTION rst_3[1]       = {{RES_PROPERTY, {&rst_7}}};
-		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
-		RESTRICTION rst_6          = {RES_AND, {&rst_4}};
+		static constexpr uint8_t fixed_true = 1;
 
-		// /* C1: apptstartwhole >= start && apptstartwhole <= end */
-		// RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &start_whole}};
-		// RESTRICTION_PROPERTY rst_2 = {RELOP_LE, ptag.apptstartwhole, {ptag.apptstartwhole, &end_whole}};
-		// RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
-		// RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
-		// RESTRICTION rst_6          = {RES_AND, {&rst_4}};
+		/* C1: apptstartwhole >= start && apptstartwhole <= end */
+		RESTRICTION_PROPERTY rst_1 = {RELOP_GE, apptstartwhole, {apptstartwhole, &start_nttime}};
+		RESTRICTION_PROPERTY rst_2 = {RELOP_LE, apptstartwhole, {apptstartwhole, &end_nttime}};
+		RESTRICTION rst_3[2]       = {{RES_PROPERTY, {&rst_1}}, {RES_PROPERTY, {&rst_2}}};
+		RESTRICTION_AND_OR rst_4   = {std::size(rst_3), rst_3};
+
+		/* C2: apptendwhole >= start && apptendwhole <= end */
+		RESTRICTION_PROPERTY rst_5 = {RELOP_GE, apptendwhole, {apptendwhole, &start_nttime}};
+		RESTRICTION_PROPERTY rst_6 = {RELOP_LE, apptendwhole, {apptendwhole, &end_nttime}};
+		RESTRICTION rst_7[2]       = {{RES_PROPERTY, {&rst_5}}, {RES_PROPERTY, {&rst_6}}};
+		RESTRICTION_AND_OR rst_8   = {std::size(rst_7), rst_7};
+
+		/* C3: apptstartwhole < start && apptendwhole > end */
+		RESTRICTION_PROPERTY rst_9  = {RELOP_LT, apptstartwhole, {apptstartwhole, &start_nttime}};
+		RESTRICTION_PROPERTY rst_10 = {RELOP_GT, apptendwhole, {apptendwhole, &end_nttime}};
+		RESTRICTION rst_11[2]       = {{RES_PROPERTY, {&rst_9}}, {RES_PROPERTY, {&rst_10}}};
+		RESTRICTION_AND_OR rst_12   = {std::size(rst_11), rst_11};
+
+		/* C4: have(clipend) && recurring && clipend >= start */
+		RESTRICTION_EXIST rst_13    = {ptag.clipend};
+		RESTRICTION_PROPERTY rst_14 = {RELOP_EQ, recc, {recc, deconst(&fixed_true)}};
+		RESTRICTION_PROPERTY rst_15 = {RELOP_GE, clipend, {clipend, &start_nttime}};
+		RESTRICTION rst_16[3]       = {{RES_EXIST, {&rst_13}}, {RES_PROPERTY, {&rst_14}}, {RES_PROPERTY, {&rst_15}}};
+		RESTRICTION_AND_OR rst_17   = {std::size(rst_16), rst_16};
+
+		/* C5: !have(clipend) && recurring && apptstartwhole <= end */
+		RESTRICTION_EXIST rst_18    = {ptag.clipend};
+		RESTRICTION rst_19          = {RES_EXIST, {&rst_18}};
+		RESTRICTION_PROPERTY rst_20 = {RELOP_EQ, recc, {recc, deconst(&fixed_true)}};
+		RESTRICTION_PROPERTY rst_21 = {RELOP_LE, apptstartwhole, {apptstartwhole, &end_nttime}};
+		RESTRICTION rst_22[3]       = {{RES_NOT, {&rst_19}}, {RES_PROPERTY, {&rst_20}}, {RES_PROPERTY, {&rst_21}}};
+		RESTRICTION_AND_OR rst_23   = {std::size(rst_22), rst_22};
+
+		/* OR over C1-C5 */
+		RESTRICTION rst_24[5]       = {{RES_AND, {&rst_4}}, {RES_AND, {&rst_8}}, {RES_AND, {&rst_12}}, {RES_AND, {&rst_17}}, {RES_AND, {&rst_23}}};
+		RESTRICTION_AND_OR rst_25   = {std::size(rst_24), rst_24};
+		RESTRICTION rst_26          = {RES_OR, {&rst_25}};
 
 		uint32_t table_id = 0, row_count = 0;
-		if (!exmdb_client::load_content_table(par.cur.dir.c_str(), CP_ACP, cal_eid, nullptr, TABLE_FLAG_NONOTIFICATIONS, &rst_6, nullptr, &table_id, &row_count))
-			mlog(LV_ERR, "W-PREC: cannot load table content: %s", par.cur.dir.c_str());
-		mlog(LV_ERR, "W-PREC: returned number of rows is: %d", row_count);
-		auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(par.cur.dir.c_str(), table_id); });
+		if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr,
+			TABLE_FLAG_NONOTIFICATIONS, &rst_26, nullptr, &table_id, &row_count))
+			return false;
 
+		auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id);});
 		uint32_t proptag_buff[] = {
 			PR_ENTRYID, apptstartwhole, apptstartwhole, PR_START_DATE, PR_END_DATE,
 		};
@@ -1025,25 +1053,25 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			&proptags, 0, row_count, &rows))
 			mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
-		for (size_t i = 0; i < rows.count; ++i) {
-			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
+		// for (size_t i = 0; i < rows.count; ++i) {
+		// 	mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
 			
-			// Get the start and end times from the content table
-			auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
-			auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
+		// 	// Get the start and end times from the content table
+		// 	auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
+		// 	auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
 
-			auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
-			auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
+		// 	auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
+		// 	auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
 
-			// Check for overlap with existing appointments
-			if ((start_wholes >= start_whole) && (start_wholes <= end_whole))
-			{
-				// Conflict found, set the status and return
-				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
-				out_status = 1;
-			}
-			mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
-		}
+		// 	// Check for overlap with existing appointments
+		// 	if ((start_wholes >= start_whole) && (start_wholes <= end_whole))
+		// 	{
+		// 		// Conflict found, set the status and return
+		// 		mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+		// 		out_status = 1;
+		// 	}
+		// 	mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
+		// }
 
 		// No conflicts found
 		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
