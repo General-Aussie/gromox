@@ -1019,7 +1019,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		RESTRICTION_AND_OR rst_12   = {std::size(rst_11), rst_11};
 
 		/* OR over C1-C5 */
-		RESTRICTION rst_24[5]       = {{RES_AND, {&rst_4}}, {RES_AND, {&rst_8}}, {RES_AND, {&rst_12}}};
+		RESTRICTION rst_24[3]       = {{RES_AND, {&rst_4}}, {RES_AND, {&rst_8}}, {RES_AND, {&rst_12}}};
 		RESTRICTION_AND_OR rst_25   = {std::size(rst_24), rst_24};
 		RESTRICTION rst_26          = {RES_OR, {&rst_25}};
 
@@ -1030,8 +1030,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 
 		auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id);});
 		uint32_t proptag_buff[] = {
-			PR_ENTRYID, apptstartwhole, apptstartwhole, PR_START_DATE, PR_END_DATE,
+			PR_ENTRYID, apptstartwhole, apptendwhole, PR_START_DATE, PR_END_DATE,
 		};
+
 		const PROPTAG_ARRAY proptags = {std::size(proptag_buff), deconst(proptag_buff)};
 		TARRAY_SET rows;
 		if (!exmdb_client::query_table(par.cur.dir.c_str(), nullptr, CP_ACP, table_id,
