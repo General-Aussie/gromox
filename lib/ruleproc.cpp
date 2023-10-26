@@ -1039,25 +1039,25 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			&proptags, 0, row_count, &rows))
 			mlog(LV_ERR, "W-PREC: cannot query table: %s", par.cur.dir.c_str());
 		mlog(LV_ERR, "W-PREC: returned number of rows for query table is: %d", rows.count);
-		// for (size_t i = 0; i < rows.count; ++i) {
-		// 	mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
+		for (size_t i = 0; i < rows.count; ++i) {
+			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
 			
-		// 	// Get the start and end times from the content table
-		// 	auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
-		// 	auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
+			// // Get the start and end times from the content table
+			// auto event_start_time = rows.pparray[i]->get<const uint64_t>(PR_START_DATE);
+			// auto event_end_time = rows.pparray[i]->get<uint64_t>(PR_END_DATE);
 
-		// 	auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
-		// 	auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
+			// auto start_wholes = rop_util_nttime_to_unix(*event_start_time);
+			// auto end_wholes = rop_util_nttime_to_unix(*event_end_time);
 
-		// 	// Check for overlap with existing appointments
-		// 	if ((start_wholes >= start_whole) && (start_wholes <= end_whole))
-		// 	{
-		// 		// Conflict found, set the status and return
-		// 		mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
-		// 		out_status = 1;
-		// 	}
-		// 	mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
-		// }
+			// Check for overlap with existing appointments
+			if ((apptstartwhole >= start_nttime) && (apptendwhole <= end_nttime))
+			{
+				// Conflict found, set the status and return
+				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+				out_status = 1;
+			}
+			mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
+		}
 
 		// No conflicts found
 		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
