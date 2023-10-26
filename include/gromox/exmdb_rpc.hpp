@@ -856,8 +856,8 @@ struct exreq_autoreply_tsupdate : public exreq {
 struct exreq_appt_meetreq_overlap : public exreq {
 	char *dir;
 	char *username;
-	uint64_t start_time; 
-	uint64_t end_time;
+	uint64_t *start_time; 
+	uint64_t *end_time;
 };
 
 struct exreq_recalc_store_size : public exreq {
@@ -1305,7 +1305,7 @@ struct exresp_autoreply_tsquery : public exresp {
 };
 
 struct exresp_appt_meetreq_overlap : public exresp {
-	uint32_t out_status;
+	uint32_t *out_status;
 };
 
 using exreq_ping_store = exreq;

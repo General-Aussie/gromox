@@ -3965,7 +3965,7 @@ BOOL exmdb_server::rule_new_message(const char *dir, const char *username,
  * Compares the meeting request indicated by @appt_mid whether it conflicts with any existing appointments in @fid.
  * @out_status will be filled with value 1 if there is a timeslot conflict between any appointment and the new meeting request.
  */
-BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t start_time, uint64_t end_time, uint32_t *out_status)
+ec_error_t exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, uint64_t *start_time, uint64_t *end_time, uint32_t *out_status)
 {
 	mlog(LV_ERR, "W-PREC: entering meeting overlap check %s", dir);
     // Assume no conflict initially
@@ -3980,7 +3980,7 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
     if (!get_freebusy(dir, username, start, end, freebusyData))
     {
 		mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
-        return FALSE; // An error occurred while retrieving free/busy data.
+        // return FALSE; // An error occurred while retrieving free/busy data.
     }
 	mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
 
@@ -3996,18 +3996,16 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
         // Check for overlap with existing appointments
         if ((event_start_time >= start && event_start_time <= end) ||
             (event_end_time >= start && event_end_time <= end) ||
-            (event_start_time < start && event_end_time > end) ||
-            (is_recurring && event_end_time >= start) ||
-            (!is_recurring && event_start_time <= end))
+            (event_start_time < start && event_end_time > end))
         {
             // Conflict found, set the status and return
 			mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
             *out_status = 1;
-            return TRUE;
+            // return TRUE;
         }
     }
 
     // No conflicts found
 	mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
-    return FALSE;
+    return ecSuccess;
 }
