@@ -969,8 +969,8 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// auto startt = rop_util_unix_to_nttime(start_whole);
 		// auto endd = rop_util_unix_to_nttime(end_whole);
 		
-		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, start_whole, end_whole, &out_status))
-		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
+		if (!exmdb_client::appt_meetreq_overlap(dir, use_name, start, end, &out_status))
+			mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	}
 	mlog(LV_ERR, "W-PREC: outstatus is: %u", out_status);
 	mlog(LV_ERR, "W-PREC: check meeting overlap successful %s", par.cur.dir.c_str());
@@ -1016,21 +1016,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	// if (props_new.set(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]), &finvited) != 0)
 	// 	return ecError;
 
-	PropertyValuePair propertiesToSet[] = {
-		{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
-		{PR_MESSAGE_CLASS, "IPM.Appointment"},
-		{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]))},
-		{PROP_TAG(PT_LONG, propids.ppropid[7]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[7]))},
-		{PROP_TAG(PT_BOOLEAN, propids.ppropid[8]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]))},
-		{PROP_TAG(PT_LONG, propids.ppropid[9]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[9]))},
-		{PROP_TAG(PT_BOOLEAN, propids.ppropid[10]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]))},
-	};
 
-	for (const auto& prop : propertiesToSet) {
-		if (props_new.set(prop.proptag, prop.value) != 0) {
-			return ecError;
-		}
-	}	
+	
+		
 
     if (isRoomMailbox || isEquipmentMailbox) {
 		mlog(LV_ERR, "W-PREC: entering if statement %s", par.cur.dir.c_str());
@@ -1069,19 +1057,34 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 						mlog(LV_INFO, "Declined due to conflict.\n");
 					}   
 				}
-		
-				if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
-					return ecError;
-				if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
-					return ecError;
-				mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted %s", par.cur.dir.c_str());
 
-				if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
-					return ecError;
-				if (props.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
-					return ecError;
-				if (props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
-					return ecError;
+				PropertyValuePair propertiesToSet[] = {
+					{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
+					{PR_MESSAGE_CLASS, "IPM.Appointment"},
+					{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]))},
+					{PROP_TAG(PT_LONG, propids.ppropid[7]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[7]))},
+					{PROP_TAG(PT_BOOLEAN, propids.ppropid[8]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]))},
+					{PROP_TAG(PT_LONG, propids.ppropid[9]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[9]))},
+					{PROP_TAG(PT_BOOLEAN, propids.ppropid[10]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]))},
+				};
+
+				for (const auto& prop : propertiesToSet) {
+					if (props_new.set(prop.proptag, prop.value) != 0)
+						return ecError;
+				}
+		
+				// if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
+				// 	return ecError;
+				// if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
+				// 	return ecError;
+				// mlog(LV_ERR, "W-PREC: PR_MESSAGE_CLASS set to accepted %s", par.cur.dir.c_str());
+
+				// if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
+				// 	return ecError;
+				// if (props.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
+				// 	return ecError;
+				// if (props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
+				// 	return ecError;
 				// if (props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
 				// 	return ecError;
 				// if (props.set(PROP_TAG(PT_LONG, propids.ppropid[2]), &busy) != 0)
@@ -1108,7 +1111,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+			nullptr, CP_ACP, par.cur.mid, &props_new, &problems))
 			return ecRpcFailed;
 	}
 
