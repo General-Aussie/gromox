@@ -1026,7 +1026,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		uint32_t table_id = 0, row_count = 0;
 		if (!exmdb_client::load_content_table(dir, CP_ACP, cal_eid, nullptr,
 			TABLE_FLAG_NONOTIFICATIONS, &rst_26, nullptr, &table_id, &row_count))
-			return false;
+			mlog(LV_ERR, "W-PREC: cannot load table: %s", par.cur.dir.c_str());
 
 		auto cl_0 = make_scope_exit([&]() { exmdb_client::unload_table(dir, table_id);});
 		uint32_t proptag_buff[] = {
