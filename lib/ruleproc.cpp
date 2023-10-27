@@ -866,7 +866,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
-	
+
 	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	if (pmessage_class == nullptr){
 		pmessage_class = par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS_A);
@@ -917,16 +917,16 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	} else {
 		permission = frightsFreeBusyDetailed | frightsReadAny;
 	}
-	
+
 	uint32_t out_status = 0;
 	if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
 		// auto start = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
 		// auto end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
-		
+
 		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, *start, *end, &out_status))
 		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	}
-		
+
 	bool isEquipmentMailbox = false;
 	bool isRoomMailbox = false;
 
@@ -960,29 +960,59 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 					}   
 				}
 			}
-			
-		uint64_t change_num = 0, modtime = 0;
+
+		// uint32_t proptag_buff[] = {
+		// 	response_stat, busy_stat, PR_MESSAGE_CLASS,
+		// };
+		// PROPTAG_ARRAY proptags1 = {std::size(proptag_buff), deconst(proptag_buff)};
+
+		// TPROPVAL_ARRAY props_new;
+		// if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), use_name,
+		// 	CP_ACP, par.cur.mid, &proptags1, &props_new))
+		// {
+		// 	return ecError;
+		// }
+
+		// PropertyValuePair propertiesToSet[] = {
+		// 	{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
+		// 	{PR_MESSAGE_CLASS, "IPM.Appointment"},
+		// 	{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]))},
+		// 	{PROP_TAG(PT_LONG, propids.ppropid[4]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]))},
+		// 	{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]))},
+		// 	{PROP_TAG(PT_LONG, propids.ppropid[6]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]))},
+		// 	{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]))},
+		// };
+
+		// for (const auto& prop : propertiesToSet) {
+		// 	if (props_new.set(prop.proptag, prop.value) != 0) {
+		// 		return ecError;
+		// 	}
+		// }
+
+
+		uint64_t change_num = 0;
 		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
 			return ecRpcFailed;
 		auto change_key = xid_to_bin({GUID{}, change_num});
 		if (change_key == nullptr)
 			return ecServerOOM;
-		const TAGGED_PROPVAL valdata[] = {
+		uint64_t modtime = rop_util_current_nttime();
+		TAGGED_PROPVAL valdata[] = {
 			{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
 			{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
-			{PR_MESSAGE_CLASS, deconst("IPM.Appointment")},
+			{PR_MESSAGE_CLASS, "IPM.Appointment"},
 			{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]))},
 			{PROP_TAG(PT_LONG, propids.ppropid[4]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]))},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]))},
+			{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]))},
 			{PROP_TAG(PT_LONG, propids.ppropid[6]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]))},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]))},
+			{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]))},
 			{PidTagChangeNumber, &change_num},
 			{PR_CHANGE_KEY, change_key},
 			{PR_LOCAL_COMMIT_TIME, &modtime},
 			{PR_LAST_MODIFICATION_TIME, &modtime},
 		};
 
-		const TPROPVAL_ARRAY valhdr = {std::size(valdata), deconst(valdata)};
+		const TPROPVAL_ARRAY valhdr = {std::size(valdata), valdata};
 		if (valdata[1].pvalue == nullptr)
 			return ecServerOOM;
 		PROBLEM_ARRAY problems{};
