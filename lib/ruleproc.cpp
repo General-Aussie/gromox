@@ -862,7 +862,7 @@ static ec_error_t rx_resource_type(rxparam par, bool *isEquipmentMailbox, bool *
     return ecSuccess;
 }
 
-static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy, bool *meetingresponse) {
+static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int policy) {
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
@@ -920,14 +920,13 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 	
 	uint32_t out_status = 0;
 	if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
-		auto start = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
-		auto end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
+		// auto start = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
+		// auto end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
 		
 		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, *start, *end, &out_status))
 		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	}
-	
-	auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+		
 	bool isEquipmentMailbox = false;
 	bool isRoomMailbox = false;
 
@@ -974,9 +973,9 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{PR_MESSAGE_CLASS, "IPM.Appointment"},
 			{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]))},
 			{PROP_TAG(PT_LONG, propids.ppropid[4]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]))},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]))},
+			{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]))},
 			{PROP_TAG(PT_LONG, propids.ppropid[6]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]))},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]))},
+			{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]))},
 			{PidTagChangeNumber, &change_num},
 			{PR_CHANGE_KEY, change_key},
 			{PR_LOCAL_COMMIT_TIME, &modtime},
