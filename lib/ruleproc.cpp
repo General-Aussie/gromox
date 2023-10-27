@@ -821,8 +821,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
-	bool move_message = false;
-
+	
 	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	if (pmessage_class == nullptr){
 		pmessage_class = par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS_A);
@@ -934,7 +933,6 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
                 }
 				if (recurring == nullptr || *recurring == 0) {
 					if (out_status == 1) {
-						move_message = false;
 						if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 							return ecError;
 						if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
@@ -944,7 +942,6 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 					}
 				}
 				if(out_status == 1) {
-					move_message = false;
 					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 						return ecError;
 					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
@@ -954,7 +951,6 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 					return ecSuccess;
 				}   
 				if (out_status == 0) {
-					move_message = true;
 					auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
 					auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]));
 					auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]));
