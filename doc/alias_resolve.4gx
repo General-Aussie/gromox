@@ -1,28 +1,34 @@
 .\" SPDX-License-Identifier: CC-BY-SA-4.0 or-later
-.\" SPDX-FileCopyrightText: 2021 grommunio GmbH
+.\" SPDX-FileCopyrightText: 2023 grommunio GmbH
 .TH alias_resolve 4gx "" "Gromox" "Gromox admin reference"
 .SH Name
 alias_resolve \(em Alias resolution and expansion for delivery(8gx)
 .SH Description
 alias_resolve is a component of the delivery agent which rewrites the Envelope
-FROM and RCPT fields of incoming messages, resolving aliases to the primary
-email address, resolving contact objects where they occur, and expanding
-mailing lists to their members.
+FROM and RCPT fields of incoming messages, trimming extensions, resolving
+aliases to the primary email address, resolving contact objects where they
+occur, and expanding mailing lists to their members.
 .SH Configuration directives
 alias_resolve(4gx) reads /etc/gromox/mysql_adaptor.cfg for \fBmysql_host\fP,
 \fBmysql_port\fP, \fBmysql_username\fP, \fBmysql_password\fP,
 \fBmysql_dbname\fP and \fBmysql_rdwr_timeout\fP. Confer with mysql_adaptor(4gx)
 for details.
 .PP
-alias_resolve(4gx) reads /etc/gromox/alias_resolve.cfg:
+alias_resolve(4gx) reads /etc/gromox/gromox.cfg:
 .TP
-\fBcache_lifetime\fP
-Interval between alias map refreshes.
+\fBlda_alias_cache_lifetime\fP
+Interval between refreshes of the alias and contact object cache.
 .br
 Default: \fI1h\fP
+.TP
+\fBlda_recipient_delimiter\fP
+The set of characters that separate an email address into localpart and
+extension. This mirrors the "recipient_delimiter" directive from postconf(5).
+.br
+Default: (empty)
 .SH Signals
-When the plugin is reloaded (i.e. SIGHUP to delivery(8gx)), the alias map is
-refreshed as well, resetting the timer for the next refresh.
+When the plugin is reloaded (i.e. SIGHUP is sent to delivery(8gx)), the alias
+cache is refreshed as well, resetting the timer for the next refresh.
 .SH Files
 .IP \(bu 4
 \fIdata_file_path\fP/mlist_bounce/: response templates for when a mailing list

@@ -355,7 +355,8 @@ static BOOL emsmdb_interface_create_handle(const char *username,
 			return FALSE;
 		}
 	} else {
-		if (uh_iter->second.size() >= emsmdb_max_cxh_per_user) {
+		if (emsmdb_max_cxh_per_user > 0 &&
+		    uh_iter->second.size() >= emsmdb_max_cxh_per_user) {
 			mlog(LV_WARN, "W-1580: user %s reached maximum CXH (%u)",
 			        phandle->username, emsmdb_max_cxh_per_user);
 			g_handle_hash.erase(phandle->guid);
@@ -1113,7 +1114,7 @@ void emsmdb_interface_event_proc(const char *dir, BOOL b_table,
 		return;
 	}
 	auto rsp = static_cast<ROP_RESPONSE *>(pnode->pdata);
-	rsp->rop_id = ropRegisterNotify;
+	rsp->rop_id = ropNotify;
 	rsp->hindex = 0; /* ignore by system */
 	rsp->result = 0; /* ignore by system */
 	auto nfr = notify_response::create(obj_handle, logon_id);

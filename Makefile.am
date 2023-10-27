@@ -1,7 +1,7 @@
 # -*- Makefile -*-
 
 ACLOCAL_AMFLAGS = -I build-aux
-AM_CPPFLAGS = ${my_CPPFLAGS} -Iinclude -I${top_srcdir}/include ${crypto_CFLAGS} ${iconv_CPPFLAGS} ${HX_CFLAGS} ${jsoncpp_CFLAGS} ${mysql_CFLAGS} ${olecf_CFLAGS} ${pff_CFLAGS} ${sqlite_CFLAGS} ${ssl_CFLAGS} ${xml2_CFLAGS} ${zlib_CFLAGS}
+AM_CPPFLAGS = ${my_CPPFLAGS} -Iinclude -I${top_srcdir}/include ${crypto_CFLAGS} ${gss_CFLAGS} ${iconv_CPPFLAGS} ${HX_CFLAGS} ${jsoncpp_CFLAGS} ${mysql_CFLAGS} ${olecf_CFLAGS} ${pff_CFLAGS} ${sqlite_CFLAGS} ${ssl_CFLAGS} ${xml2_CFLAGS} ${zlib_CFLAGS}
 AM_CFLAGS   = ${my_CFLAGS} -fvisibility=default
 AM_CXXFLAGS = ${my_CXXFLAGS}
 AM_LDFLAGS  = ${my_LDFLAGS}
@@ -126,7 +126,7 @@ libgxs_midb_agent_la_LIBADD = -lpthread ${HX_LIBS} libgromox_common.la
 EXTRA_libgxs_midb_agent_la_DEPENDENCIES = ${default_sym}
 
 http_SOURCES = exch/http/hpm_processor.cpp exch/http/hpm_processor.h exch/http/http_parser.cpp exch/http/http_parser.h exch/http/listener.cpp exch/http/listener.h exch/http/main.cpp exch/http/mod_cache.cpp exch/http/mod_cache.hpp exch/http/mod_fastcgi.cpp exch/http/mod_fastcgi.h exch/http/mod_rewrite.cpp exch/http/mod_rewrite.h exch/http/pdu_ndr.cpp exch/http/pdu_ndr.h exch/http/pdu_ndr_ids.hpp exch/http/pdu_processor.cpp exch/http/pdu_processor.h exch/http/resource.h exch/http/system_services.cpp exch/http/system_services.hpp lib/svc_loader.cpp
-http_LDADD = -lpthread ${crypto_LIBS} ${dl_LIBS} ${fmt_LIBS} ${HX_LIBS} ${ssl_LIBS} libgromox_common.la libgromox_cplus.la libgromox_epoll.la libgromox_email.la libgromox_rpc.la libgromox_mapi.la
+http_LDADD = -lpthread ${crypto_LIBS} ${dl_LIBS} ${fmt_LIBS} ${gss_LIBS} ${HX_LIBS} ${ssl_LIBS} libgromox_common.la libgromox_cplus.la libgromox_epoll.la libgromox_email.la libgromox_rpc.la libgromox_mapi.la
 midb_SOURCES = exch/midb/cmd_parser.cpp exch/midb/cmd_parser.h exch/midb/common_util.cpp exch/midb/common_util.h exch/midb/exmdb_client.cpp exch/midb/exmdb_client.h exch/midb/listener.cpp exch/midb/listener.h exch/midb/mail_engine.cpp exch/midb/mail_engine.hpp exch/midb/main.cpp exch/midb/system_services.cpp exch/midb/system_services.hpp lib/svc_loader.cpp
 midb_LDADD = -lpthread ${HX_LIBS} ${dl_LIBS} ${iconv_LIBS} ${jsoncpp_LIBS} ${sqlite_LIBS} libgromox_common.la libgromox_cplus.la libgromox_dbop.la libgromox_email.la libgromox_exrpc.la libgromox_mapi.la
 zcore_SOURCES = exch/zcore/ab_tree.cpp exch/zcore/ab_tree.h exch/zcore/attachment_object.cpp exch/zcore/bounce_producer.hpp exch/zcore/common_util.cpp exch/zcore/common_util.h exch/zcore/container_object.cpp exch/zcore/exmdb_client.cpp exch/zcore/exmdb_client.h exch/zcore/folder_object.cpp exch/zcore/ics_state.cpp exch/zcore/ics_state.h exch/zcore/icsdownctx_object.cpp exch/zcore/icsupctx_object.cpp exch/zcore/listener.cpp exch/zcore/listener.hpp exch/zcore/main.cpp exch/zcore/message_object.cpp exch/zcore/names.cpp exch/zcore/object_tree.cpp exch/zcore/object_tree.h exch/zcore/objects.hpp exch/zcore/rpc_ext.cpp exch/zcore/rpc_ext.h exch/zcore/rpc_parser.cpp exch/zcore/rpc_parser.hpp exch/zcore/store_object.cpp exch/zcore/store_object.h exch/zcore/system_services.cpp exch/zcore/system_services.hpp exch/zcore/table_object.cpp exch/zcore/table_object.h exch/zcore/user_object.cpp exch/zcore/zserver.cpp exch/zcore/zserver.hpp lib/svc_loader.cpp
@@ -270,7 +270,7 @@ tests_compress_LDADD = libgromox_common.la
 tests_cryptest_SOURCES = tests/cryptest.cpp
 tests_cryptest_LDADD = libgromox_common.la
 tests_epv_unpack_SOURCES = tests/epv_unpack.cpp tools/edb_pack.cpp tools/edb_pack.hpp
-tests_epv_unpack_LDADD = ${esedb_LIBS} libgromox_mapi.la
+tests_epv_unpack_LDADD = ${esedb_LIBS} ${HX_LIBS} libgromox_common.la libgromox_mapi.la
 tests_gxl_383_SOURCES = tests/gxl-383.cpp
 tests_gxl_383_LDADD = libgromox_common.la libgromox_exrpc.la libgromox_mapi.la
 tests_jsontest_SOURCES = tests/jsontest.cpp
@@ -318,7 +318,7 @@ endif
 if HAVE_PFF
 dist_man_MANS += doc/gromox-pff2mt.8
 endif
-
+ 
 abkt_files = data/401-0.abkt data/401-1.abkt data/401-2.abkt data/401-200.abkt data/401-3.abkt data/401-6.abkt data/402-0.abkt data/402-1.abkt data/402-2.abkt data/402-200.abkt data/402-3.abkt data/402-6.abkt data/403-0.abkt data/403-1.abkt data/403-2.abkt data/403-200.abkt data/403-3.abkt data/403-6.abkt data/404-0.abkt data/404-1.abkt data/404-2.abkt data/404-200.abkt data/404-3.abkt data/404-6.abkt data/405-0.abkt data/405-1.abkt data/405-2.abkt data/405-200.abkt data/405-3.abkt data/405-6.abkt data/406-0.abkt data/406-1.abkt data/406-2.abkt data/406-200.abkt data/406-3.abkt data/406-6.abkt data/407-0.abkt data/407-1.abkt data/407-2.abkt data/407-200.abkt data/407-3.abkt data/407-6.abkt data/408-0.abkt data/408-1.abkt data/408-2.abkt data/408-200.abkt data/408-3.abkt data/408-6.abkt data/409-0.abkt data/409-1.abkt data/409-2.abkt data/409-200.abkt data/409-3.abkt data/409-6.abkt data/40b-0.abkt data/40b-1.abkt data/40b-2.abkt data/40b-200.abkt data/40b-3.abkt data/40b-6.abkt
 abkt_files += data/40c-0.abkt data/40c-1.abkt data/40c-2.abkt data/40c-200.abkt data/40c-3.abkt data/40c-6.abkt data/40d-0.abkt data/40d-1.abkt data/40d-2.abkt data/40d-200.abkt data/40d-3.abkt data/40d-6.abkt data/40e-0.abkt data/40e-1.abkt data/40e-2.abkt data/40e-200.abkt data/40e-3.abkt data/40e-6.abkt data/40f-0.abkt data/40f-1.abkt data/40f-2.abkt data/40f-200.abkt data/40f-3.abkt data/40f-6.abkt data/410-0.abkt data/410-1.abkt data/410-2.abkt data/410-200.abkt data/410-3.abkt data/410-6.abkt data/411-0.abkt data/411-1.abkt data/411-2.abkt data/411-200.abkt data/411-3.abkt data/411-6.abkt data/412-0.abkt data/412-1.abkt data/412-2.abkt data/412-200.abkt data/412-3.abkt data/412-6.abkt data/413-0.abkt data/413-1.abkt data/413-2.abkt data/413-200.abkt data/413-3.abkt data/413-6.abkt data/414-0.abkt data/414-1.abkt data/414-2.abkt data/414-200.abkt data/414-3.abkt data/414-6.abkt data/415-0.abkt data/415-1.abkt data/415-2.abkt data/415-200.abkt data/415-3.abkt data/415-6.abkt
 abkt_files += data/416-0.abkt data/416-1.abkt data/416-2.abkt data/416-200.abkt data/416-3.abkt data/416-6.abkt data/418-0.abkt data/418-1.abkt data/418-2.abkt data/418-200.abkt data/418-3.abkt data/418-6.abkt data/419-0.abkt data/419-1.abkt data/419-2.abkt data/419-200.abkt data/419-3.abkt data/419-6.abkt data/41a-0.abkt data/41a-1.abkt data/41a-2.abkt data/41a-200.abkt data/41a-3.abkt data/41a-6.abkt data/41b-0.abkt data/41b-1.abkt data/41b-2.abkt data/41b-200.abkt data/41b-3.abkt data/41b-6.abkt data/41d-0.abkt data/41d-1.abkt data/41d-2.abkt data/41d-200.abkt data/41d-3.abkt data/41d-6.abkt data/41e-0.abkt data/41e-1.abkt data/41e-2.abkt data/41e-200.abkt data/41e-3.abkt data/41e-6.abkt data/41f-0.abkt data/41f-1.abkt data/41f-2.abkt data/41f-200.abkt data/41f-3.abkt data/41f-6.abkt data/420-0.abkt data/420-1.abkt data/420-2.abkt data/420-200.abkt data/420-3.abkt data/420-6.abkt data/421-0.abkt data/421-1.abkt data/421-2.abkt data/421-200.abkt data/421-3.abkt data/421-6.abkt

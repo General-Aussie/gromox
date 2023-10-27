@@ -21,8 +21,8 @@ struct GX_EXPORT MIME {
 	~MIME();
 
 	using write_func = ssize_t (*)(void *, const void *, size_t);
-	static MIME *create() try {
-		return new MIME();
+	static std::unique_ptr<MIME> create() try {
+		return std::make_unique<MIME>();
 	} catch (const std::bad_alloc &) {
 		return nullptr;
 	}
@@ -54,9 +54,9 @@ struct GX_EXPORT MIME {
 	const MIME *get_parent() const;
 	MIME *get_sibling();
 	const MIME *get_sibling() const;
-	inline size_t get_children_num() const { return node.get_children_num(); }
+	inline size_t get_children_num() const { return stree.get_children_num(); }
 
-	SIMPLE_TREE_NODE node{};
+	SIMPLE_TREE_NODE stree{};
 	enum mime_type mime_type = mime_type::none;
 	int boundary_len = 0;
 	char content_type[VALUE_LEN]{}, boundary_string[VALUE_LEN]{};

@@ -110,16 +110,15 @@ errno_t mysql_adaptor_meta(const char *username, unsigned int wantpriv,
 		mres.errstr = "User is not a real user";
 		return EACCES;
 	}
-	auto temp_status = strtoul(myrow[2], nullptr, 0);
-	if (temp_status != 0 && !(wantpriv & WANTPRIV_METAONLY)) {
-		auto uval = temp_status & AF_USER__MASK;
-		if (temp_status & AF_DOMAIN__MASK) {
+	auto address_status = strtoul(myrow[2], nullptr, 0);
+	if (!afuser_login_allowed(address_status) && !(wantpriv & WANTPRIV_METAONLY)) {
+		auto uval = address_status & AF_USER__MASK;
+		if (address_status & AF_DOMAIN__MASK)
 			mres.errstr = fmt::format("Domain of user \"{}\" is disabled!", username);
-		} else if (uval == AF_USER_SHAREDMBOX) {
+		else if (uval == AF_USER_SHAREDMBOX)
 			mres.errstr = fmt::format("\"{}\" is a shared mailbox with no login", username);
-		} else if (uval != 0) {
+		else if (uval != 0)
 			mres.errstr = fmt::format("User \"{}\" is disabled", username);
-		}
 		return EACCES;
 	}
 	wantpriv &= ~WANTPRIV_METAONLY;
@@ -218,10 +217,9 @@ BOOL mysql_adaptor_setpasswd(const char *username,
 		dtypx = static_cast<enum display_type>(strtoul(myrow[1], nullptr, 0));
 	if (dtypx != DT_MAILUSER)
 		return FALSE;
-	auto temp_status = strtoul(myrow[2], nullptr, 0);
-	if (0 != temp_status) {
+	auto address_status = strtoul(myrow[2], nullptr, 0);
+	if (address_status != 0)
 		return FALSE;
-	}
 	if (!(strtoul(myrow[3], nullptr, 0) & USER_PRIVILEGE_CHGPASSWD))
 		return FALSE;
 
@@ -876,14 +874,34 @@ BOOL mysql_adaptor_check_same_org2(const char *domainname1,
 	return false;
 }
 
+static std::string strip_ext(std::string user, const char *delim)
+{
+	/*
+	 * Ugh, this duplicates logic from alias_resolve.cpp. (dq and delivery
+	 * really need to be combined).
+	 */
+	auto at = strchr(user.c_str(), '@');
+	if (at != nullptr) {
+		size_t atpos = at - user.c_str();
+		auto sv = atpos == user.npos ? std::string_view(user) :
+		          std::string_view(user.c_str(), atpos);
+		auto expos = sv.find_first_of(delim);
+		if (expos != user.npos && expos < atpos)
+			user.erase(expos, atpos - expos);
+	}
+	return std::move(user);
+}
+
 /* only used by delivery-queue; who can receive mail? */
-bool mysql_adaptor_check_user(const char *username, char *path, size_t dsize) try
+bool mysql_adaptor_check_user(const char *user_raw, const char *delim,
+    char *path, size_t dsize) try
 {
 	char temp_name[UADDR_SIZE*2];
 
 	if (path != nullptr)
 		*path = '\0';
-	mysql_adaptor_encode_squote(username, temp_name);
+	auto username = strip_ext(user_raw, delim);
+	mysql_adaptor_encode_squote(username.c_str(), temp_name);
 	auto qstr =
 		"SELECT DISTINCT u.address_status, u.maildir FROM users AS u "
 		"LEFT JOIN aliases AS a ON u.username=a.mainname "
@@ -899,14 +917,13 @@ bool mysql_adaptor_check_user(const char *username, char *path, size_t dsize) tr
 	if (pmyres.num_rows() == 0) {
 		return false;
 	} else if (pmyres.num_rows() > 1) {
-		mlog(LV_WARN, "W-1510: userdb conflict: <%s> is in both \"users\" and \"aliases\"", username);
+		mlog(LV_WARN, "W-1510: userdb conflict: <%s> is in both \"users\" and \"aliases\"", username.c_str());
 		return false;
 	}
 	auto myrow = pmyres.fetch_row();
 	if (path != nullptr)
 		gx_strlcpy(path, myrow[1], dsize);
-	unsigned int status = strtoul(myrow[0], nullptr, 0);
-	return status == AF_USER_NORMAL || status == AF_USER_SHAREDMBOX;
+	return afuser_store_canrecv(strtoul(myrow[0], nullptr, 0));
 } catch (const std::exception &e) {
 	mlog(LV_ERR, "%s: %s", "E-1731", e.what());
 	return false;
