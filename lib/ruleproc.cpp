@@ -817,34 +817,7 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 	return ecSuccess;
 }
 
-static int get_policy_from_message_content(rxparam par)
-{
-	int flags = 0;
-    for (size_t i = 0; i < par.ctnt->proplist.count; ++i)
-    {
-        auto prop = par.ctnt->proplist.ppropval[i];
-		switch (prop.proptag)
-		{
-			case PR_SCHDINFO_AUTO_ACCEPT_APPTS:
-				if (prop.pvalue)
-					flags |= POLICY_PROCESS_MEETING_REQUESTS;
-				break;
-
-			case PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS:
-				if (prop.pvalue)
-					flags |= POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS;
-				break;
-
-			case PR_SCHDINFO_DISALLOW_RECURRING_APPTS:
-				if (prop.pvalue)
-					flags |= POLICY_DECLINE_RECURRING_MEETING_REQUESTS;
-				break;
-		}
-	}
-    return flags;
-}
-
-static ec_error_t process_meeting_requests(rxparam par, const char* dir, int policy, bool isEquipmentMailbox, bool isRoomMailbox) {
+static ec_error_t process_meeting_requests(rxparam par, const char* dir, int policy, bool *isResource) {
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
@@ -909,7 +882,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	}
 
-    if (isRoomMailbox || isEquipmentMailbox) {
+    if (isResource) {
         if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
             strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
                 if (recurring != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
@@ -983,27 +956,39 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 	return ecSuccess;
 }
 
-static ec_error_t rx_resource_type(rxparam &par, const char* dir, int policy,  bool *isEquipmentMailbox, bool *isRoomMailbox)
-{
+static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
+	int flags = 0;
+	bool isResource = false;
     if (par.ctnt->children.prcpts != nullptr) {
         for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
-            auto addrtype =  par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
+			auto addrtype =  par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
             if (addrtype != nullptr) {
                 auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
-				if (*disptype == static_cast<unsigned int>(DT_ROOM)) {
-					*isRoomMailbox = true;
-					auto err = process_meeting_requests(par, dir, policy, isEquipmentMailbox, isRoomMailbox);
-					if (err != ecSuccess)
-						return err;
-				} else if (*disptype == static_cast<unsigned int>(DT_EQUIPMENT)) {
-					*isEquipmentMailbox = true;
-					auto err = process_meeting_requests(par, dir, policy, isEquipmentMailbox, isRoomMailbox);
+				if (*disptype != static_cast<unsigned int>(DT_ROOM) || *disptype != static_cast<unsigned int>(DT_EQUIPMENT)){
+					isResource = true;
+					auto prop = par.ctnt->proplist.ppropval[i];
+					switch (prop.proptag)
+					{
+						case PR_SCHDINFO_AUTO_ACCEPT_APPTS:
+							if (prop.pvalue)
+								flags |= POLICY_PROCESS_MEETING_REQUESTS;
+							break;
+						case PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS:
+							if (prop.pvalue)
+								flags |= POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS;
+							break;
+						case PR_SCHDINFO_DISALLOW_RECURRING_APPTS:
+							if (prop.pvalue)
+								flags |= POLICY_DECLINE_RECURRING_MEETING_REQUESTS;
+							break;
+					}
+					auto err = process_meeting_requests(par, dir, flags, &isResource);
 					if (err != ecSuccess)
 						return err;
 				}
-            }
-        }
-    }
+			}
+		}
+	}
     return ecSuccess;
 }
 
@@ -1028,10 +1013,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	    par.cur.mid, &par.ctnt))
 		return ecError;
 
-	bool isEquipmentMailbox = false;
-	bool isRoomMailbox = false;
-	int policy = get_policy_from_message_content(par);
-	err = rx_resource_type(par, dir, policy, &isEquipmentMailbox, &isRoomMailbox);
+	err = get_policy_from_message_content(par, dir);
 	if (err != ecSuccess)
 		return err;
 	for (auto &&rule : rule_list) {
