@@ -970,7 +970,7 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		const TAGGED_PROPVAL valdata[] = {
 			{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
 			{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
-			{PR_MESSAGE_CLASS, "IPM.Appointment"},
+			{PR_MESSAGE_CLASS, deconst("IPM.Appointment")},
 			{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]))},
 			{PROP_TAG(PT_LONG, propids.ppropid[4]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]))},
 			{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]))},
