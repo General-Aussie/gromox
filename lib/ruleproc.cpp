@@ -898,16 +898,16 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 			auto event_start_time = event.start_time;
 			auto event_end_time = event.end_time;
 
-			bool is_recurring = event.details && event.details->is_recurring;
+			// bool is_recurring = event.details && event.details->is_recurring;
 			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
 			// Check for overlap with existing appointments
-			if ((event_start_time >= start && event_start_time <= end) ||
-				(event_end_time >= start && event_end_time <= end) ||
-				(event_start_time < start && event_end_time > end))
+			if ((event_start_time >= start_nt && event_start_time <= end_nt) ||
+				(event_end_time >= start_nt && event_end_time <= end_nt) ||
+				(event_start_time < start_nt && event_end_time > end_nt))
 			{
 				// Conflict found, set the status and return
-				mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
-				*out_status = 1;
+				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+				out_status = 1;
 				// return TRUE;
 			}
 		}
