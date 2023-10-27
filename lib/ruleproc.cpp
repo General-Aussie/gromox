@@ -821,6 +821,8 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
+	bool move_message = false;
+	TAGGED_PROPVAL valdata;
 
 	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	if (pmessage_class == nullptr){
@@ -924,75 +926,86 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
         if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
             strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
                 if (recurring != nullptr) {
-					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
+					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+						return ecError;
+					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
 						mlog(LV_ERR, "W-PREC: meeting is recurring %s", dir);
 						return ecError;
 					}
                 }
 				if (recurring == nullptr || *recurring == 0) {
 					if (out_status == 1) {
-						if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+						move_message = false;
+						if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 							return ecError;
-						if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+						if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 							return ecError;
+						mlog(LV_ERR, "W-PREC: meeting is not recurring and has a conflict %s", dir);
+						return ecSuccess;
 					}
-					mlog(LV_ERR, "W-PREC: meeting is recurring and has a conflict %s", dir);
-					return ecSuccess;
 				}
 				if(out_status == 1) {
-					if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+					move_message = false;
+					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 						return ecError;
-					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
+					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
 						mlog(LV_ERR, "W-PREC: meeting is conflicting %s", dir);
 						return ecError;
 					}
 					return ecSuccess;
 				}   
+				if (out_status == 0) {
+					move_message = true;
+					auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+					auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]));
+					auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]));
+					auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]));
+					auto finvited = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]));
+
+					uint64_t change_num = 0;
+					if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
+						return ecRpcFailed;
+					auto change_key = xid_to_bin({GUID{}, change_num});
+					if (change_key == nullptr)
+						return ecServerOOM;
+					uint64_t modtime = rop_util_current_nttime();
+					TAGGED_PROPVAL valdata[] = {
+						{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
+						{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
+						{PR_MESSAGE_CLASS, deconst("IPM.Appointment")},
+						{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), &recurring},
+						{PROP_TAG(PT_LONG, propids.ppropid[4]), &stateflag},
+						{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), &subtype},
+						{PROP_TAG(PT_LONG, propids.ppropid[6]), &meetingtype},
+						{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]),  &finvited},
+						{PidTagChangeNumber, &change_num},
+						{PR_CHANGE_KEY, change_key},
+						{PR_LOCAL_COMMIT_TIME, &modtime},
+						{PR_LAST_MODIFICATION_TIME, &modtime},
+					};
+				}
+				if (move_message){
+					const TPROPVAL_ARRAY valhdr = {std::size(valdata), valdata};
+					if (valdata[1].pvalue == nullptr)
+						return ecServerOOM;
+					PROBLEM_ARRAY problems{};
+					if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+						nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
+						return ecRpcFailed;
+					uint64_t dst_mid = 0;
+					BOOL result = false;
+					if (!exmdb_client::allocate_message_id(par.cur.dir.c_str(), cal_eid, &dst_mid))
+						return ecRpcFailed;
+					if (!exmdb_client::movecopy_message(par.cur.dir.c_str(), 0, CP_ACP,
+						par.cur.mid, cal_eid, dst_mid, TRUE, &result))
+						return ecRpcFailed;
+					return ecSuccess;
+				}
+				PROBLEM_ARRAY problems{};
+				if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
+					nullptr, CP_ACP, par.cur.mid, &props, &problems))
+					return ecRpcFailed;
 			}
-	
-		auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
-		auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]));
-		auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]));
-		auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]));
-		auto finvited = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]));
-
-		uint64_t change_num = 0;
-		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
-			return ecRpcFailed;
-		auto change_key = xid_to_bin({GUID{}, change_num});
-		if (change_key == nullptr)
-			return ecServerOOM;
-		uint64_t modtime = rop_util_current_nttime();
-		TAGGED_PROPVAL valdata[] = {
-			{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
-			{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
-			{PR_MESSAGE_CLASS, deconst("IPM.Appointment")},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), &recurring},
-			{PROP_TAG(PT_LONG, propids.ppropid[4]), &stateflag},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), &subtype},
-			{PROP_TAG(PT_LONG, propids.ppropid[6]), &meetingtype},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]),  &finvited},
-			{PidTagChangeNumber, &change_num},
-			{PR_CHANGE_KEY, change_key},
-			{PR_LOCAL_COMMIT_TIME, &modtime},
-			{PR_LAST_MODIFICATION_TIME, &modtime},
-		};
-
-		const TPROPVAL_ARRAY valhdr = {std::size(valdata), valdata};
-		if (valdata[1].pvalue == nullptr)
-			return ecServerOOM;
-		PROBLEM_ARRAY problems{};
-		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
-			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
-			return ecRpcFailed;
-		uint64_t dst_mid = 0;
-		BOOL result = false;
-		if (!exmdb_client::allocate_message_id(par.cur.dir.c_str(), cal_eid, &dst_mid))
-			return ecRpcFailed;
-		if (!exmdb_client::movecopy_message(par.cur.dir.c_str(), 0, CP_ACP,
-			par.cur.mid, cal_eid, dst_mid, TRUE, &result))
-			return ecRpcFailed;
-		return ecSuccess;
 	}
 	return ecSuccess;
 }
