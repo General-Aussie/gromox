@@ -882,70 +882,50 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 		auto start_nt = rop_util_nttime_to_unix(*start);
 		auto end_nt = rop_util_nttime_to_unix(*end);
 		if (!get_freebusy(use_name, dir, start_nt, end_nt, freebusyData))
-		{
 			mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
-			// return FALSE; // An error occurred while retrieving free/busy data.
-		}
-		mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
 
-		// Check the count of items in the freebusyData array
-		mlog(LV_ERR, "W-PREC: Number of items in freebusyData: %d", freebusyData.size());
-
-		// Iterate through free/busy events and check for conflicts
 		for (const freebusy_event &event : freebusyData)
 		{
-			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
 			auto event_start_time = event.start_time;
 			auto event_end_time = event.end_time;
 
-			// bool is_recurring = event.details && event.details->is_recurring;
-			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
 			// Check for overlap with existing appointments
 			if ((event_start_time >= start_nt && event_start_time <= end_nt) ||
 				(event_end_time >= start_nt && event_end_time <= end_nt) ||
 				(event_start_time < start_nt && event_end_time > end_nt))
-			{
-				// Conflict found, set the status and return
+				// Conflict found, set the status
 				out_status = 1;
-				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
-				
-				// return TRUE;
-			}
 		}
-
-		// No conflicts found
-		mlog(LV_ERR, "W-PREC: conflict count %d", out_status);
-
-		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, *start, *end, &out_status))
-		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
 	}
 
     if (isResource) {
         if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
             strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
-                if (recurring != nullptr) {
+				if (policy != 0){
+					if (recurring != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
+						if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+							return ecError;
+						if (props->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+							return ecError;
+					}
+					if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
+						if (recurring == nullptr || *recurring == 0) {
+							if (out_status == 1) {
+								if (props->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+									return ecError;
+								if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+									return ecError;
+							}   
+						}       
+					}
+				}
+                if ((recurring != nullptr || recurring == nullptr || *recurring == 0) && out_status == 1) {
 					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 						return ecError;
 					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
 						return ecError;
 					}
                 }
-				if (recurring == nullptr || *recurring == 0) {
-					if (out_status == 1) {
-						if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
-							return ecError;
-						if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-							return ecError;
-						mlog(LV_ERR, "W-PREC: meeting is not recurring and has a conflict %s", dir);
-					}
-				}
-				if(out_status == 1) {
-					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
-						return ecError;
-					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-						return ecError;
-					mlog(LV_ERR, "W-PREC: meeting just has a conflict %s", dir);
-				}   
 				if (out_status == 0) {
 					auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
 					auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]));
@@ -1013,10 +993,6 @@ static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
 					auto prop = par.ctnt->proplist.ppropval[i];
 					switch (prop.proptag)
 					{
-						case PR_SCHDINFO_AUTO_ACCEPT_APPTS:
-							if (prop.pvalue)
-								flags |= POLICY_PROCESS_MEETING_REQUESTS;
-							break;
 						case PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS:
 							if (prop.pvalue)
 								flags |= POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS;
