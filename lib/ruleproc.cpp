@@ -875,8 +875,45 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 
 	uint32_t out_status = 0;
 	if (par.ctnt->proplist.has(PR_START_DATE) && par.ctnt->proplist.has(PR_END_DATE)){
-		// auto start = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
-		// auto end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
+		auto start = par.ctnt->proplist.get<uint64_t>(PR_START_DATE);
+		auto end = par.ctnt->proplist.get<uint64_t>(PR_END_DATE);
+		std::vector<freebusy_event> freebusyData;
+
+		auto start_nt = rop_util_nttime_to_unix(*start);
+		auto end_nt = rop_util_nttime_to_unix(*end);
+		if (!get_freebusy(use_name, dir, start_nt, end_nt, freebusyData))
+		{
+			mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
+			// return FALSE; // An error occurred while retrieving free/busy data.
+		}
+		mlog(LV_ERR, "W-PREC: successfully retrieved freebusy %s", dir);
+
+		// Check the count of items in the freebusyData array
+		mlog(LV_ERR, "W-PREC: Number of items in freebusyData: %d", freebusyData.size());
+
+		// Iterate through free/busy events and check for conflicts
+		for (const freebusy_event &event : freebusyData)
+		{
+			mlog(LV_ERR, "W-PREC: inside for loop %s", dir);
+			auto event_start_time = event.start_time;
+			auto event_end_time = event.end_time;
+
+			bool is_recurring = event.details && event.details->is_recurring;
+			mlog(LV_ERR, "W-PREC: about to check the if block %s", dir);
+			// Check for overlap with existing appointments
+			if ((event_start_time >= start && event_start_time <= end) ||
+				(event_end_time >= start && event_end_time <= end) ||
+				(event_start_time < start && event_end_time > end))
+			{
+				// Conflict found, set the status and return
+				mlog(LV_ERR, "W-PREC: conflict found %d", *out_status);
+				*out_status = 1;
+				// return TRUE;
+			}
+		}
+
+		// No conflicts found
+		mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
 
 		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, *start, *end, &out_status))
 		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
