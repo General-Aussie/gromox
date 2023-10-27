@@ -990,6 +990,50 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 		// }
 
 
+		// 	write this to be very efficinet and standard
+
+
+		// uint32_t proptag_buff[] = {
+		// 	response_stat, busy_stat, PR_MESSAGE_CLASS,
+		// };
+		// PROPTAG_ARRAY proptags1 = {std::size(proptag_buff), deconst(proptag_buff)};
+
+		// TPROPVAL_ARRAY props_new{};
+		// 	if (!exmdb_client::get_message_properties(par.cur.dir.c_str(), use_name,
+		// 		CP_ACP, par.cur.mid, &proptags1, &props_new))
+		// 		return ecError;
+	
+		auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
+		// auto recurrpatt = par.ctnt->proplist.get(PROP_TAG(PT_UNICODE, propids.ppropid[6]));
+		auto stateflag = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]));
+		auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]));
+		auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]));
+		auto finvited = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]));
+
+		// bool isEquipmentMailbox = false;
+		// bool isRoomMailbox = false;
+
+		// auto res_err = rx_resource_type(par, &isEquipmentMailbox, &isRoomMailbox);
+		// if (res_err != ecSuccess) {
+		// 	return res_err;
+		// 	mlog(LV_WARN, "W-1554: Meeting Processed Done but not successful %s", par.cur.dir.c_str());
+		// }
+
+		// if (props_new.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
+		// 	return ecError;
+		// if (props_new.set(PR_MESSAGE_CLASS, "IPM.Appointment") != 0)
+		// 	return ecError;
+		// if (props_new.set(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), &recurring) != 0)
+		// 	return ecError;
+		// if (props_new.set(PROP_TAG(PT_LONG, propids.ppropid[7]), &stateflag) != 0)
+		// 	return ecError;
+		// if (props_new.set(PROP_TAG(PT_BOOLEAN, propids.ppropid[8]), &subtype) != 0)
+		// 	return ecError;
+		// if (props_new.set(PROP_TAG(PT_LONG, propids.ppropid[9]), &meetingtype) != 0)
+		// 	return ecError;
+		// if (props_new.set(PROP_TAG(PT_BOOLEAN, propids.ppropid[10]), &finvited) != 0)
+		// 	return ecError;
+
 		uint64_t change_num = 0;
 		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
 			return ecRpcFailed;
@@ -1001,11 +1045,11 @@ static ec_error_t process_meeting_requests(rxparam &par, const char* dir, int po
 			{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
 			{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
 			{PR_MESSAGE_CLASS, "IPM.Appointment"},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]))},
-			{PROP_TAG(PT_LONG, propids.ppropid[4]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[4]))},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]))},
-			{PROP_TAG(PT_LONG, propids.ppropid[6]), par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]))},
-			{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]), par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]))},
+			{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), &recurring},
+			{PROP_TAG(PT_LONG, propids.ppropid[4]), &stateflag},
+			{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), &subtype},
+			{PROP_TAG(PT_LONG, propids.ppropid[6]), &meetingtype},
+			{PROP_TAG(PT_BOOLEAN, propids.ppropid[7]),  &finvited},
 			{PidTagChangeNumber, &change_num},
 			{PR_CHANGE_KEY, change_key},
 			{PR_LOCAL_COMMIT_TIME, &modtime},
