@@ -905,13 +905,13 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 					if (recurring != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
 						if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 							return ecError;
-						if (props->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+						if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 							return ecError;
 					}
 					if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
 						if (recurring == nullptr || *recurring == 0) {
 							if (out_status == 1) {
-								if (props->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+								if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 									return ecError;
 								if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 									return ecError;
