@@ -942,13 +942,12 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 		auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]));
 		auto finvited = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]));
 
-		uint64_t change_num = 0;
+		uint64_t change_num = 0, modtime = 0;
 		if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
 			return ecRpcFailed;
 		auto change_key = xid_to_bin({GUID{}, change_num});
 		if (change_key == nullptr)
 			return ecServerOOM;
-		uint64_t modtime = rop_util_current_nttime();
 		TAGGED_PROPVAL valdata[] = {
 			{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
 			{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
