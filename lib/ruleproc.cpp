@@ -821,7 +821,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
-	
+
 	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	if (pmessage_class == nullptr){
 		pmessage_class = par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS_A);
@@ -927,7 +927,6 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 						return ecError;
 					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
-						mlog(LV_ERR, "W-PREC: meeting is recurring %s", dir);
 						return ecError;
 					}
                 }
@@ -938,17 +937,14 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 						if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 							return ecError;
 						mlog(LV_ERR, "W-PREC: meeting is not recurring and has a conflict %s", dir);
-						return ecSuccess;
 					}
 				}
 				if(out_status == 1) {
 					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 						return ecError;
-					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
-						mlog(LV_ERR, "W-PREC: meeting is conflicting %s", dir);
+					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 						return ecError;
-					}
-					return ecSuccess;
+					mlog(LV_ERR, "W-PREC: meeting just has a conflict %s", dir);
 				}   
 				if (out_status == 0) {
 					auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
