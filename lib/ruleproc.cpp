@@ -906,14 +906,15 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 				(event_start_time < start_nt && event_end_time > end_nt))
 			{
 				// Conflict found, set the status and return
-				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
 				out_status = 1;
+				mlog(LV_ERR, "W-PREC: conflict found %d", out_status);
+				
 				// return TRUE;
 			}
 		}
 
 		// No conflicts found
-		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
+		mlog(LV_ERR, "W-PREC: conflict count %d", out_status);
 
 		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, *start, *end, &out_status))
 		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
@@ -922,28 +923,31 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
     if (isResource) {
         if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
             strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
-                if (recurring != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
-					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
+                if (recurring != nullptr) {
+					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
+						mlog(LV_ERR, "W-PREC: meeting is recurring %s", dir);
 						return ecError;
+					}
                 }
-				if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
-					if (recurring == nullptr || *recurring == 0) {
-						if (out_status == 1) {
-							if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
-								return ecError;
-							if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-								return ecError;
-						}
-						return ecSuccess;   
-					}       
-					if(out_status == 1) {
+				if (recurring == nullptr || *recurring == 0) {
+					if (out_status == 1) {
 						if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 							return ecError;
 						if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
 							return ecError;
-						return ecSuccess;
-					}   
+					}
+					mlog(LV_ERR, "W-PREC: meeting is recurring and has a conflict %s", dir);
+					return ecSuccess;
 				}
+				if(out_status == 1) {
+					if (par.ctnt->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+						return ecError;
+					if (par.ctnt->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
+						mlog(LV_ERR, "W-PREC: meeting is conflicting %s", dir);
+						return ecError;
+					}
+					return ecSuccess;
+				}   
 			}
 	
 		auto recurring = par.ctnt->proplist.get<uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[0]));
