@@ -822,7 +822,6 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
 	bool move_message = false;
-	TAGGED_PROPVAL valdata;
 
 	auto pmessage_class = par.ctnt->proplist.get<const char>(PR_MESSAGE_CLASS);
 	if (pmessage_class == nullptr){
@@ -983,8 +982,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 						{PR_LOCAL_COMMIT_TIME, &modtime},
 						{PR_LAST_MODIFICATION_TIME, &modtime},
 					};
-				}
-				if (move_message){
+
 					const TPROPVAL_ARRAY valhdr = {std::size(valdata), valdata};
 					if (valdata[1].pvalue == nullptr)
 						return ecServerOOM;
