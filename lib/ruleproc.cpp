@@ -844,30 +844,6 @@ static int get_policy_from_message_content(rxparam par)
     return flags;
 }
 
-static ec_error_t rx_resource_type(rxparam &par, const char* dir, int policy,  bool *isEquipmentMailbox, bool *isRoomMailbox)
-{
-    if (par.ctnt->children.prcpts != nullptr) {
-        for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
-            auto addrtype =  par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
-            if (addrtype != nullptr) {
-                auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
-				if (*disptype == static_cast<unsigned int>(DT_ROOM)) {
-					*isRoomMailbox = true;
-					auto err = process_meeting_requests(par, dir, policy, &isEquipmentMailbox, &isRoomMailbox);
-					if (err != ecSuccess)
-						return err;
-				} else if (*disptype == static_cast<unsigned int>(DT_EQUIPMENT)) {
-					*isEquipmentMailbox = true;
-					auto err = process_meeting_requests(par, dir, policy);
-					if (err != ecSuccess)
-						return err;
-				}
-            }
-        }
-    }
-    return ecSuccess;
-}
-
 static ec_error_t process_meeting_requests(rxparam par, const char* dir, int policy, bool *isEquipmentMailbox, bool *isRoomMailbox) {
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
@@ -995,7 +971,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 		if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 			nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
 			return ecRpcFailed;
-			uint64_t dst_mid = 0;
+		uint64_t dst_mid = 0;
 		BOOL result = false;
 		if (!exmdb_client::allocate_message_id(par.cur.dir.c_str(), cal_eid, &dst_mid))
 			return ecRpcFailed;
@@ -1005,6 +981,30 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 		return ecSuccess;
 	}
 	return ecSuccess;
+}
+
+static ec_error_t rx_resource_type(rxparam &par, const char* dir, int policy,  bool *isEquipmentMailbox, bool *isRoomMailbox)
+{
+    if (par.ctnt->children.prcpts != nullptr) {
+        for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
+            auto addrtype =  par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
+            if (addrtype != nullptr) {
+                auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
+				if (*disptype == static_cast<unsigned int>(DT_ROOM)) {
+					*isRoomMailbox = true;
+					auto err = process_meeting_requests(par, dir, policy, &isEquipmentMailbox, &isRoomMailbox);
+					if (err != ecSuccess)
+						return err;
+				} else if (*disptype == static_cast<unsigned int>(DT_EQUIPMENT)) {
+					*isEquipmentMailbox = true;
+					auto err = process_meeting_requests(par, dir, policy, &isEquipmentMailbox, &isRoomMailbox);
+					if (err != ecSuccess)
+						return err;
+				}
+            }
+        }
+    }
+    return ecSuccess;
 }
 
 ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
@@ -1031,7 +1031,7 @@ ec_error_t exmdb_local_rules_execute(const char *dir, const char *ev_from,
 	bool isEquipmentMailbox = false;
 	bool isRoomMailbox = false;
 	int policy = get_policy_from_message_content(par);
-	err = rx_resource_type(par, dir, policy, &isEquipmentMailbox, &isRoomMailbox)
+	err = rx_resource_type(par, dir, policy, &isEquipmentMailbox, &isRoomMailbox);
 	if (err != ecSuccess)
 		return err;
 	for (auto &&rule : rule_list) {
