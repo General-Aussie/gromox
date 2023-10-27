@@ -992,12 +992,12 @@ static ec_error_t rx_resource_type(rxparam &par, const char* dir, int policy,  b
                 auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
 				if (*disptype == static_cast<unsigned int>(DT_ROOM)) {
 					*isRoomMailbox = true;
-					auto err = process_meeting_requests(par, dir, policy, &isEquipmentMailbox, &isRoomMailbox);
+					auto err = process_meeting_requests(par, dir, policy, isEquipmentMailbox, isRoomMailbox);
 					if (err != ecSuccess)
 						return err;
 				} else if (*disptype == static_cast<unsigned int>(DT_EQUIPMENT)) {
 					*isEquipmentMailbox = true;
-					auto err = process_meeting_requests(par, dir, policy, &isEquipmentMailbox, &isRoomMailbox);
+					auto err = process_meeting_requests(par, dir, policy, isEquipmentMailbox, isRoomMailbox);
 					if (err != ecSuccess)
 						return err;
 				}
