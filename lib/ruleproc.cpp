@@ -913,7 +913,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 		}
 
 		// No conflicts found
-		mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
+		mlog(LV_ERR, "W-PREC: conflict not found %d", out_status);
 
 		// if (!exmdb_client::appt_meetreq_overlap(dir, use_name, *start, *end, &out_status))
 		// 	mlog(LV_ERR, "W-PREC: Cannot check for meeting overlap %s", par.cur.dir.c_str());
