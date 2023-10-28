@@ -927,6 +927,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
 						{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
 						{PR_MESSAGE_CLASS, deconst("IPM.Appointment")},
+						{PR_DISPLAY_TO, par.ctnt->proplist.get<const char>(PR_SENDER_NAME)},
 						{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), &recurring},
 						{PROP_TAG(PT_LONG, propids.ppropid[4]), &stateflag},
 						{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), &subtype},
