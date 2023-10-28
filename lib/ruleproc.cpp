@@ -11,8 +11,8 @@
 #include <fmt/format.h>
 #include <gromox/element_data.hpp>
 #include <gromox/exmdb_client.hpp>
-#include <gromox/exmdb_server.hpp>
 #include <gromox/exmdb_rpc.hpp>
+#include <gromox/exmdb_server.hpp>
 #include <gromox/ext_buffer.hpp>
 #include <gromox/mapidefs.h>
 #include <gromox/freebusy.hpp>
@@ -28,7 +28,6 @@
 #include <gromox/rop_util.hpp>
 
 // Extended MAPI Definitions
-#define POLICY_PROCESS_MEETING_REQUESTS              0x0001
 #define POLICY_DECLINE_RECURRING_MEETING_REQUESTS    0x0002
 #define POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS  0x0004
 
@@ -94,11 +93,6 @@ struct rxparam {
 	std::set<folder_node> loop_check;
 	MESSAGE_CONTENT *ctnt = nullptr;
 	bool del = false, exit = false;
-};
-
-struct PropertyValuePair {
-	unsigned int proptag;
-	const void* value;
 };
 
 using message_content_ptr = std::unique_ptr<MESSAGE_CONTENT, rx_delete>;
@@ -901,25 +895,14 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
     if (isResource) {
         if (par.ctnt->proplist.get<char>(PR_MESSAGE_CLASS) &&
             strcmp(static_cast<const char*>(par.ctnt->proplist.getval(PR_MESSAGE_CLASS)), deconst("IPM.Schedule.Meeting.Request")) == 0) {
-				if (policy != 0){
-					if (recurring != nullptr && (policy & POLICY_DECLINE_RECURRING_MEETING_REQUESTS)) {
-						if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-							return ecError;
-						if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
-							return ecError;
+                if ((recurring == nullptr || *recurring == 0) && out_status == 1) {
+					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
+						return ecError;
+					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
+						return ecError;
 					}
-					if (policy & POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS) {
-						if (recurring == nullptr || *recurring == 0) {
-							if (out_status == 1) {
-								if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
-									return ecError;
-								if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0)
-									return ecError;
-							}   
-						}       
-					}
-				}
-                if ((recurring != nullptr || recurring == nullptr || *recurring == 0) && out_status == 1) {
+                }
+				if (recurring != nullptr && recurring == true && out_status == 1) {
 					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 						return ecError;
 					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
@@ -984,28 +967,14 @@ static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
 	int flags = 0;
 	bool isResource = false;
     if (par.ctnt->children.prcpts != nullptr) {
-        for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
-			auto addrtype =  par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
-            if (addrtype != nullptr) {
-                auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
-				if (*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)){
-					isResource = true;
-					auto prop = par.ctnt->proplist.ppropval[i];
-					switch (prop.proptag)
-					{
-						case PR_SCHDINFO_DISALLOW_OVERLAPPING_APPTS:
-							if (prop.pvalue)
-								flags |= POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS;
-							break;
-						case PR_SCHDINFO_DISALLOW_RECURRING_APPTS:
-							if (prop.pvalue)
-								flags |= POLICY_DECLINE_RECURRING_MEETING_REQUESTS;
-							break;
-					}
-					auto err = process_meeting_requests(par, dir, flags, &isResource);
-					if (err != ecSuccess)
-						return err;
-				}
+		auto addrtype =  par.ctnt->children.prcpts->pparray->get<const char>(PR_ADDRTYPE);
+        if (addrtype != nullptr) {
+            auto disptype = par.ctnt->children.prcpts->pparray->get<const uint32_t>(PR_DISPLAY_TYPE);
+			if (*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)){
+				isResource = true;
+				auto err = process_meeting_requests(par, dir, flags, &isResource);
+				if (err != ecSuccess)
+					return err;
 			}
 		}
 	}
