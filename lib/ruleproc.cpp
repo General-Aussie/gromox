@@ -969,7 +969,7 @@ static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
     if (par.ctnt->children.prcpts != nullptr) {
 		auto addrtype = par.ctnt->children.prcpts->pparray[1]->get<const char>(PR_ADDRTYPE);
         if (addrtype != nullptr) {
-            auto disptype = par.ctnt->children.prcpts->pparray.get<const uint32_t>(PR_DISPLAY_TYPE);
+            auto disptype = par.ctnt->children.prcpts->pparray[1]->get<const uint32_t>(PR_DISPLAY_TYPE);
 			if (*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)){
 				isResource = true;
 				auto err = process_meeting_requests(par, dir, flags, &isResource);
