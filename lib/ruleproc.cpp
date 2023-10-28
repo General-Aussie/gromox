@@ -883,8 +883,12 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 			if ((event_start_time >= start_nt && event_start_time <= end_nt) ||
 				(event_end_time >= start_nt && event_end_time <= end_nt) ||
 				(event_start_time < start_nt && event_end_time > end_nt))
-				// Conflict found, set the status
-				out_status = 1;
+				{
+					// Check the busy status, if it's olBusy, set out_status to 1
+					if (event.busy_status == olBusy) {
+						out_status = 1;
+					}
+				}
 		}
 	}
 
