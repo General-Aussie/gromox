@@ -885,7 +885,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 				(event_start_time < start_nt && event_end_time > end_nt))
 				{
 					// Check the busy status, if it's olBusy, set out_status to 1
-					if (event.busy_status != olBusy) {
+					if (event.busy_status == olBusy) {
 						out_status = 1;
 					}
 				}
