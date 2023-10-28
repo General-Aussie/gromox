@@ -902,7 +902,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, int pol
 						return ecError;
 					}
                 }
-				if (recurring != nullptr && recurring == true && out_status == 1) {
+				if (recurring != nullptr && out_status == 1) {
 					if (props.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseDeclined) != 0)
 						return ecError;
 					if (props.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Neg") != 0){
@@ -967,9 +967,9 @@ static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
 	int flags = 0;
 	bool isResource = false;
     if (par.ctnt->children.prcpts != nullptr) {
-		auto addrtype =  par.ctnt->children.prcpts->pparray->get<const char>(PR_ADDRTYPE);
+		auto addrtype =  par.ctnt->children.prcpts->pparray.get<const char>(PR_ADDRTYPE);
         if (addrtype != nullptr) {
-            auto disptype = par.ctnt->children.prcpts->pparray->get<const uint32_t>(PR_DISPLAY_TYPE);
+            auto disptype = par.ctnt->children.prcpts->pparray.get<const uint32_t>(PR_DISPLAY_TYPE);
 			if (*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)){
 				isResource = true;
 				auto err = process_meeting_requests(par, dir, flags, &isResource);
