@@ -968,7 +968,7 @@ static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
 	bool isResource = false;
 	auto i = 1;
     if (par.ctnt->children.prcpts != nullptr) {
-		auto addrtype = par.ctnt->children.prcpts->pparray->[]get<const char>(PR_ADDRTYPE);
+		auto addrtype = par.ctnt->children.prcpts->pparray->[i]get<const char>(PR_ADDRTYPE);
 		auto addretype = par.ctnt->children.prcpts->pparray->[1]get<const char>(PR_ADDRTYPE);
         if (addrtype != nullptr) {
             auto disptype = par.ctnt->children.prcpts->pparray.get<const uint32_t>(PR_DISPLAY_TYPE);
