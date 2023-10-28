@@ -27,10 +27,6 @@
 #include <gromox/list_file.hpp>
 #include <gromox/rop_util.hpp>
 
-// Extended MAPI Definitions
-#define POLICY_DECLINE_RECURRING_MEETING_REQUESTS    0x0002
-#define POLICY_DECLINE_CONFLICTING_MEETING_REQUESTS  0x0004
-
 using namespace gromox;
 namespace exmdb_client = exmdb_client_remote;
 
@@ -811,7 +807,7 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 	return ecSuccess;
 }
 
-static ec_error_t process_meeting_requests(rxparam par, const char* dir, int policy, bool *isResource) {
+static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *isResource) {
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
@@ -973,7 +969,7 @@ static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
             auto disptype = par.ctnt->children.prcpts->pparray[1]->get<const uint32_t>(PR_DISPLAY_TYPE);
 			if (*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)){
 				isResource = true;
-				auto err = process_meeting_requests(par, dir, flags, &isResource);
+				auto err = process_meeting_requests(par, dir, &isResource);
 				if (err != ecSuccess)
 					return err;
 			}
