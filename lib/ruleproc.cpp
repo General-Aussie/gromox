@@ -961,12 +961,11 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 
 static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
 	bool isResource = false;
-	unsigned int j = 1;
     if (par.ctnt->children.prcpts != nullptr) {
         for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
-			auto addrtype =  par.ctnt->children.prcpts->pparray[j]->get<const char>(PR_ADDRTYPE);
+			auto addrtype =  par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
             if (addrtype != nullptr) {
-                auto disptype = par.ctnt->children.prcpts->pparray[j]->get<const uint32_t>(PR_DISPLAY_TYPE);
+                auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
 				if (*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)){
 					isResource = true;
 					auto err = process_meeting_requests(par, dir, &isResource);
