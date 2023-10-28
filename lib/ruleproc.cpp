@@ -965,7 +965,7 @@ static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
 	mlog(LV_ERR, "ruleproc: rcpt count: %d", i);
     if (par.ctnt->children.prcpts != nullptr) {
 		mlog(LV_ERR, "ruleproc: deletion unsuccessful -1");
-		auto addrtype = par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
+		auto addrtype = par.ctnt->children.prcpts->pparray[]->get<const char>(PR_ADDRTYPE);
 		mlog(LV_ERR, "ruleproc: deletion unsuccessful -2");
         if (addrtype != nullptr) {
             auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
