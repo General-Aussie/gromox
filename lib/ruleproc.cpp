@@ -961,12 +961,14 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 
 static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
 	bool isResource = false;
+	auto i = par.ctnt->children.prcpts->count;
+	mlog(LV_ERR, "ruleproc: rcpt count: %s" i);
     if (par.ctnt->children.prcpts != nullptr) {
-		mlog(LV_DEBUG, "ruleproc: deletion unsuccessful -1");
-		auto addrtype = par.ctnt->children.prcpts->pparray[1]->get<const char>(PR_ADDRTYPE);
-		mlog(LV_DEBUG, "ruleproc: deletion unsuccessful -2");
+		mlog(LV_ERR, "ruleproc: deletion unsuccessful -1");
+		auto addrtype = par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
+		mlog(LV_ERR, "ruleproc: deletion unsuccessful -2");
         if (addrtype != nullptr) {
-            auto disptype = par.ctnt->children.prcpts->pparray[1]->get<const uint32_t>(PR_DISPLAY_TYPE);
+            auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
 			if (*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)){
 				isResource = true;
 				auto err = process_meeting_requests(par, dir, &isResource);
