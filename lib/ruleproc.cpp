@@ -872,7 +872,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 		auto start_nt = rop_util_nttime_to_unix(*start);
 		auto end_nt = rop_util_nttime_to_unix(*end);
 		if (!get_freebusy(use_name, dir, start_nt, end_nt, freebusyData))
-			mlog(LV_ERR, "W-PREC: cannot retrieve freebusy %s", dir);
+			mlog(LV_ERR, "ruleproc: cannot retrieve freebusy %s", dir);
 
 		for (const freebusy_event &event : freebusyData)
 		{
@@ -927,7 +927,6 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						{PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted},
 						{PROP_TAG(PT_LONG, propids.ppropid[2]), &busy},
 						{PR_MESSAGE_CLASS, deconst("IPM.Appointment")},
-						{PR_DISPLAY_TO, deconst(par.ctnt->proplist.get<const char>(PR_SENDER_NAME))},
 						{PROP_TAG(PT_BOOLEAN, propids.ppropid[0]), &recurring},
 						{PROP_TAG(PT_LONG, propids.ppropid[4]), &stateflag},
 						{PROP_TAG(PT_BOOLEAN, propids.ppropid[5]), &subtype},
