@@ -966,18 +966,16 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
 	bool isResource = false;
     if (par.ctnt->children.prcpts != nullptr) {
-        for (unsigned int i = 0; i < par.ctnt->children.prcpts->count; ++i) {
-			auto addrtype =  par.ctnt->children.prcpts->pparray[i]->get<const char>(PR_ADDRTYPE);
-            if (addrtype != nullptr) {
-                auto disptype = par.ctnt->children.prcpts->pparray[i]->get<const uint32_t>(PR_DISPLAY_TYPE);
-				if ((*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)) && (par.ctnt->children.prcpts->count == 1)){
-					isResource = true;
-					auto err = process_meeting_requests(par, dir, &isResource);
-					if (err != ecSuccess)
-						return err;
-				} else {
-					return ecSuccess;
-				}
+		auto addrtype =  par.ctnt->children.prcpts->pparray[0]->get<const char>(PR_ADDRTYPE);
+        if (addrtype != nullptr) {
+            auto disptype = par.ctnt->children.prcpts->pparray[0]->get<const uint32_t>(PR_DISPLAY_TYPE);
+			if ((*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)) && (par.ctnt->children.prcpts->count == 1)){
+				isResource = true;
+				auto err = process_meeting_requests(par, dir, &isResource);
+				if (err != ecSuccess)
+					return err;
+			} else {
+				return ecSuccess;
 			}
 		}
 	}
