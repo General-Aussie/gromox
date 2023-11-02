@@ -1521,6 +1521,7 @@ static void *imps_thrwork(void *argp)
 				break;
 			if (pcontext->sched_stat == isched_stat::idling) {
 				if (pcontext->b_modify) {
+					mlog(LV_ERR, "PREC: b_modify is true")
 					pcontext->sched_stat = isched_stat::notifying;
 					contexts_pool_wakeup_context(pcontext, CONTEXT_TURNING);
 					if (pcontext == ptail)
