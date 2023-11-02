@@ -1520,7 +1520,7 @@ static void *imps_thrwork(void *argp)
 			if (pcontext == nullptr)
 				break;
 			if (pcontext->sched_stat == isched_stat::idling) {
-				if (pcontext->b_modify) {
+				if (true) {
 					mlog(LV_ERR, "b_modify is true");
 					pcontext->sched_stat = isched_stat::notifying;
 					contexts_pool_wakeup_context(pcontext, CONTEXT_TURNING);
