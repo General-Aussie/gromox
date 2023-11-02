@@ -658,7 +658,6 @@ static tproc_status ps_cmd_processing(imap_context *pcontext)
 		}
 
 		if (pcontext->sched_stat == isched_stat::idling) {
-			imap_parser_echo_modify(pcontext, nullptr);
 			size_t string_length = 0;
 			const char *imap_reply_str = nullptr;
 			if (1 != argc || 0 != strcasecmp(argv[0], "DONE")) {
@@ -1109,7 +1108,8 @@ static std::vector<imap_context *> *sh_query(const char *x)
 void imap_parser_bcast_touch(IMAP_CONTEXT *pcontext, const char *username,
     const char *folder)
 {
-	char buff[1024];
+	pcontext->b_modify = true;
+ 	char buff[1024];
 	
 	gx_strlcpy(buff, username, std::size(buff));
 	HX_strlower(buff);
@@ -1142,6 +1142,7 @@ static void imap_parser_event_touch(const char *username, const char *folder)
 
 void imap_parser_bcast_flags(IMAP_CONTEXT *pcontext, const std::string &mid_string) try
 {
+	pcontext->b_modify = true;
 	char buff[1024];
 	
 	gx_strlcpy(buff, pcontext->username, std::size(buff));
@@ -1266,6 +1267,7 @@ static void imap_parser_echo_expunges(imap_context &ctx, STREAM *stream,
 
 void imap_parser_echo_modify(IMAP_CONTEXT *pcontext, STREAM *pstream)
 {
+	pcontext->b_modify = true;
 	if (!pcontext->b_modify)
 		return;
 	int id;
@@ -1518,7 +1520,7 @@ static void *imps_thrwork(void *argp)
 			if (pcontext == nullptr)
 				break;
 			if (pcontext->sched_stat == isched_stat::idling) {
-				if (true) {
+				if (pcontext->b_modify) {
 					pcontext->sched_stat = isched_stat::notifying;
 					contexts_pool_wakeup_context(pcontext, CONTEXT_TURNING);
 					if (pcontext == ptail)
