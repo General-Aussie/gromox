@@ -928,6 +928,8 @@ tproc_status imap_parser_process(schedule_context *vctx)
 			ret = ps_stat_stls(ctx);
 		else if (ctx->sched_stat == isched_stat::notifying)
 			ret = ps_stat_notifying(ctx);
+		else if (ctx->sched_stat == isched_stat::idling)
+			ret = ps_stat_notifying(ctx);
 		else if (ctx->sched_stat == isched_stat::rdcmd ||
 		    ctx->sched_stat == isched_stat::appended ||
 		    ctx->sched_stat == isched_stat::idling)
@@ -1492,8 +1494,9 @@ static void *imps_thrwork(void *argp)
 {
 	int peek_len;
 	char tmp_buff;
-	
+	mlog(LV_ERR, "g notify stop about to be checked");
 	while (!g_notify_stop) {
+		mlog(LV_ERR, "g notify stop is false");
 		std::unique_lock ll_hold(g_list_lock);
 		imap_context *ptail = nullptr, *pcontext = nullptr;
 		if (g_sleeping_list.size() > 0)
@@ -1505,6 +1508,7 @@ static void *imps_thrwork(void *argp)
 		}
 		
 		do {
+			mlog(LV_ERR, "entering do");
 			ll_hold.lock();
 			if (g_sleeping_list.size() > 0) {
 				pcontext = g_sleeping_list.front();
@@ -1517,12 +1521,14 @@ static void *imps_thrwork(void *argp)
 				break;
 			if (pcontext->sched_stat == isched_stat::idling) {
 				if (pcontext->b_modify) {
+					mlog(LV_ERR, "b_modify is true");
 					pcontext->sched_stat = isched_stat::notifying;
 					contexts_pool_wakeup_context(pcontext, CONTEXT_TURNING);
 					if (pcontext == ptail)
 						break;
 					continue;
 				}
+				mlog(LV_ERR, "b modify is false if it didnt show 'b_modify is true' above");
 			}
 			peek_len = recv(pcontext->connection.sockd, &tmp_buff, 1, MSG_PEEK);
 			if (1 == peek_len) {
