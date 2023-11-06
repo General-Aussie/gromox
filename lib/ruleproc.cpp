@@ -1042,6 +1042,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						par.cur.fid, dst.get(), &e_result)) {
 						mlog(LV_DEBUG, "ruleproc: write_message failed");
 						return ecRpcFailed;
+					mlog(LV_ERR, "PREC: done writing out  %s", dir);
 					} else if (e_result != ecSuccess) {
 						mlog(LV_DEBUG, "ruleproc: write_message: %s\n", mapi_strerror(e_result));
 						return ecRpcFailed;
