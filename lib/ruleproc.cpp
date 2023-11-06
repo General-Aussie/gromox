@@ -807,7 +807,7 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 	return ecSuccess;
 }
 
-static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *isResource) {
+static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *isResource, const uint32_t disptype_rc, const char addrtype_rc) {
 	// TARRAY_SET *prcpts;
 	TPROPVAL_ARRAY *pproplist;
 	uint8_t tmp_byte;
@@ -1030,9 +1030,30 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (dst->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 						return ecError;
 					std::string concatenatedValue = subjectprefix + ": " + par.ctnt->proplist.get<char>(PR_SUBJECT);
+					mlog(LV_ERR, "PREC: concatenatedvale: %s", concatenatedValue);
 					if (dst->proplist.set(PR_SUBJECT, concatenatedValue.c_str()) != 0)
 						return ecError;
 					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENT_REPRESENTING_ENTRYID, par.ctnt->proplist.get<const BINARY>(PR_ENTRYID)) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENT_REPRESENTING_NAME, use_name) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENT_REPRESENTING_EMAIL_ADDRESS, par.ctnt->proplist.get<char>(PR_RCVD_REPRESENTING_EMAIL_ADDRESS)) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENT_REPRESENTING_ADDRTYPE, addrtype_rc) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENT_REPRESENTING_SEARCH_KEY, par.ctnt->proplist.get<const BINARY>(PR_RCVD_REPRESENTING_SEARCH_KEY)) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENDER_ENTRYID, par.ctnt->proplist.get<const BINARY>(PR_ENTRYID)) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENDER_EMAIL_ADDRESS, par.ctnt->proplist.get<char>(PR_RECEIVED_BY_EMAIL_ADDRESS)) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENDER_NAME, par.ctnt->proplist.get<char>(PR_RECEIVED_BY_NAME)) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENDER_ADDRTYPE, addrtype_rc) != 0)
+						return ecError;
+					if(dst->proplist.set(PR_SENDER_SEARCH_KEY, par.ctnt->proplist.get<const BINARY>(PR_RECEIVED_BY_SEARCH_KEY)) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out  %s", dir);
 					
@@ -1042,11 +1063,11 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						par.cur.fid, dst.get(), &e_result)) {
 						mlog(LV_DEBUG, "ruleproc: write_message failed");
 						return ecRpcFailed;
-					mlog(LV_ERR, "PREC: done writing out  %s", dir);
 					} else if (e_result != ecSuccess) {
 						mlog(LV_DEBUG, "ruleproc: write_message: %s\n", mapi_strerror(e_result));
 						return ecRpcFailed;
 					}
+					mlog(LV_ERR, "PREC: done writing out  %s", dir);
 					if (g_ruleproc_debug)
 						mlog(LV_DEBUG, "ruleproc: OP_COPY/MOVE to %s\n", dir);
 
@@ -1105,7 +1126,7 @@ static ec_error_t get_policy_from_message_content(rxparam par, const char* dir){
             auto disptype = par.ctnt->children.prcpts->pparray[0]->get<const uint32_t>(PR_DISPLAY_TYPE);
 			if ((*disptype == static_cast<unsigned int>(DT_ROOM) || *disptype == static_cast<unsigned int>(DT_EQUIPMENT)) && (par.ctnt->children.prcpts->count == 1)){
 				isResource = true;
-				auto err = process_meeting_requests(par, dir, &isResource);
+				auto err = process_meeting_requests(par, dir, &isResource, disptype, addrtype);
 				if (err != ecSuccess)
 					return err;
 			} else {
