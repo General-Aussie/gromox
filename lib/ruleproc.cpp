@@ -995,8 +995,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					auto tmp_bin = par.ctnt->proplist.get<const BINARY>(PR_SENT_REPRESENTING_ENTRYID);
 					auto dtypx = DT_MAILUSER;
 					mlog(LV_ERR, "PREC: about to set entryid  %s", dir);
-					if (pproplist->set(PR_ENTRYID, &tmp_bin) != 0 ||
-						pproplist->set(PR_RECIPIENT_ENTRYID, &tmp_bin) != 0 ||
+					if (pproplist->set(PR_RECIPIENT_ENTRYID, &tmp_bin) != 0 ||
 						pproplist->set(PR_RECORD_KEY, &tmp_bin) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: done setting entryid  %s", dir);
