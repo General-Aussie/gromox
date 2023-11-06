@@ -808,7 +808,7 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 }
 
 static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *isResource) {
-	TARRAY_SET *prcpts;
+	// TARRAY_SET *prcpts;
 	TPROPVAL_ARRAY *pproplist;
 	uint8_t tmp_byte;
 	std::string subjectprefix;
@@ -951,7 +951,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					// if (pclbin == nullptr)
 					// 	return ecMAPIOOM;
 					
-					const char *paddress;
+					char *paddress;
 					auto &pprops = dst->proplist;
 					if (!pprops.has(PR_LAST_MODIFICATION_TIME)) {
 						auto last_time = rop_util_current_nttime();
@@ -1020,7 +1020,8 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						return ecError;
 					if (dst->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 						return ecError;
-					if (dst->proplist.set(PR_SUBJECT, subjectprefix + ": " + par.ctnt->proplist.get<char>(PR_SUBJECT)) != 0)
+					std::string concatenatedValue = subjectprefix + ": " + par.ctnt->proplist.get<char>(PR_SUBJECT);
+					if (dst->proplist.set(PR_SUBJECT, concatenatedValue.c_str()) != 0)
 						return ecError;
 					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
 						return ecError;
@@ -1067,7 +1068,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 						nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
 						return ecRpcFailed;
-					uint64_t dst_mid = 0;
+					// dst_mid = 0;
 					BOOL result = false;
 					if (!exmdb_client::allocate_message_id(par.cur.dir.c_str(), cal_eid, &dst_mid))
 						return ecRpcFailed;
