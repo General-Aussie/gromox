@@ -807,7 +807,7 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 	return ecSuccess;
 }
 
-static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *isResource, uint32_t disptype_rc, const char* addrtype_rc) {
+static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *isResource, uint32_t disptype_rc, char* addrtype_rc) {
 	// TARRAY_SET *prcpts;
 	TPROPVAL_ARRAY *pproplist;
 	uint8_t tmp_byte;
@@ -1030,7 +1030,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (dst->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 						return ecError;
 					std::string concatenatedValue = subjectprefix + ": " + par.ctnt->proplist.get<char>(PR_SUBJECT);
-					mlog(LV_ERR, "PREC: concatenatedvale: %s", concatenatedValue);
+					// mlog(LV_ERR, "PREC: concatenatedvale: %s", concatenatedValue);
 					if (dst->proplist.set(PR_SUBJECT, concatenatedValue.c_str()) != 0)
 						return ecError;
 					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
