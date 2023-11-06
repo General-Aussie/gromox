@@ -808,6 +808,11 @@ static ec_error_t opx_process(rxparam &par, const rule_node &rule)
 }
 
 static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *isResource) {
+	TARRAY_SET *prcpts;
+	TPROPVAL_ARRAY *pproplist;
+	uint8_t tmp_byte;
+	std::string subjectprefix;
+	uint32_t tmp_int32;
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
 	auto busy = olBusy;
@@ -824,7 +829,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 		return ecSuccess;
 
 	static constexpr uint32_t tags[] = {
-		PR_DISPLAY_NAME,
+		PR_DISPLAY_NAME, 
 	};
 	static constexpr PROPTAG_ARRAY pt = {std::size(tags), deconst(tags)};
 
@@ -915,6 +920,123 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					auto subtype = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[5]));
 					auto meetingtype = par.ctnt->proplist.get<uint32_t>(PROP_TAG(PT_LONG, propids.ppropid[6]));
 					auto finvited = par.ctnt->proplist.get<const uint8_t>(PROP_TAG(PT_BOOLEAN, propids.ppropid[7]));
+					auto pdisplay_name = par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_NAME);
+
+					uint64_t dst_mid = 0, dst_cn = 0;
+					/* Prepare write */
+					message_content_ptr dst(par.ctnt->dup());
+					if (dst == nullptr)
+						return ecMAPIOOM;
+					auto err = rx_npid_replace(par, *dst, dir);
+					if (err != ecSuccess)
+						return err;
+					if (!exmdb_client::allocate_message_id(dir, par.cur.fid, &dst_mid) ||
+						!exmdb_client::allocate_cn(dir, &dst_cn))
+						return ecRpcFailed;
+
+					// XID zxid{tgt_public ? rop_util_make_domain_guid(user_id) :
+					// 		rop_util_make_user_guid(domain_id), dst_cn};
+					// char xidbuf[22];
+					// BINARY xidbin;
+					// EXT_PUSH ep;
+					// if (!ep.init(xidbuf, std::size(xidbuf), 0) ||
+					// 	ep.p_xid(zxid) != pack_result::success)
+					// 	return ecMAPIOOM;
+					// xidbin.pv = xidbuf;
+					// xidbin.cb = ep.m_offset;
+					// PCL pcl;
+					// if (!pcl.append(zxid))
+					// 	return ecMAPIOOM;
+					// std::unique_ptr<BINARY, rx_delete> pclbin(pcl.serialize());
+					// if (pclbin == nullptr)
+					// 	return ecMAPIOOM;
+					
+					const char *paddress;
+					auto &pprops = dst->proplist;
+					if (!pprops.has(PR_LAST_MODIFICATION_TIME)) {
+						auto last_time = rop_util_current_nttime();
+						auto ret = props.set(PR_LAST_MODIFICATION_TIME, &last_time);
+						if (ret != 0)
+							return ecError;
+					}
+					int ret;
+					if ((ret = pprops.set(PidTagMid, &dst_mid)) != 0 ||
+						(ret = pprops.set(PidTagChangeNumber, &dst_cn)) != 0) 
+					{
+						return ecError;
+					}
+					auto &prcpts = dst->children.prcpts;
+					prcpts = tarray_set_init();
+					if (prcpts == nullptr)
+						return ecError;
+					tmp_byte = 0;
+					dst->set_rcpts_internal(prcpts);
+					tmp_byte = 1;
+					pproplist = prcpts->emplace();
+					if (pproplist == nullptr)
+						return ecError;
+					if (pproplist->set(PR_ADDRTYPE, par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_ADDRTYPE)) != 0 ||
+						pproplist->set(PR_EMAIL_ADDRESS, par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_EMAIL_ADDRESS)) != 0 ||
+						pproplist->set(PR_SMTP_ADDRESS, par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_EMAIL_ADDRESS)) != 0)
+						return ecError;
+					if (pdisplay_name == nullptr)
+						pdisplay_name = paddress;
+					if (pproplist->set(PR_DISPLAY_NAME, pdisplay_name) != 0 ||
+						pproplist->set(PR_TRANSMITABLE_DISPLAY_NAME, pdisplay_name) != 0)
+						return ecError;
+					
+					auto tmp_bin = par.ctnt->proplist.get<const BINARY>(PR_SENT_REPRESENTING_ENTRYID);
+					auto dtypx = DT_MAILUSER;
+					if (tmp_bin != nullptr ||
+						pproplist->set(PR_ENTRYID, &tmp_bin) != 0 ||
+						pproplist->set(PR_RECIPIENT_ENTRYID, &tmp_bin) != 0 ||
+						pproplist->set(PR_RECORD_KEY, &tmp_bin) != 0)
+						return ecError;
+					auto rcpt_type = MAPI_TO;
+					if (pproplist->set(PR_RECIPIENT_TYPE, &rcpt_type) != 0)
+						return ecError;
+					tmp_int32 = static_cast<uint32_t>(dtypx == DT_DISTLIST ? MAPI_DISTLIST : MAPI_MAILUSER);
+					if (pproplist->set(PR_OBJECT_TYPE, &tmp_int32) != 0)
+						return ecError;
+					tmp_int32 = static_cast<uint32_t>(dtypx);
+					if (pproplist->set(PR_DISPLAY_TYPE, &tmp_int32) != 0)
+						return ecError;
+					tmp_byte = 1;
+					if (pproplist->set(PR_RESPONSIBILITY, &tmp_byte) != 0)
+						return ecError;
+					tmp_int32 = recipSendable;
+					if (pproplist->set(PR_RECIPIENT_FLAGS, &tmp_int32) != 0)
+						return ecError;
+					/*
+					* XXX: Value of tmp_byte is unclear, but it appears it coincides with
+					* the presence of any recipients.
+					*/
+					if (dst->proplist.set(PR_RESPONSE_REQUESTED, &tmp_byte) != 0 ||
+						dst->proplist.set(PR_REPLY_REQUESTED, &tmp_byte) != 0)
+						return ecError;
+
+					subjectprefix = "Accepted";
+					if (dst->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
+						return ecError;
+					if (dst->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
+						return ecError;
+					if (dst->proplist.set(PR_SUBJECT, subjectprefix + ": " + par.ctnt->proplist.get<char>(PR_SUBJECT)) != 0)
+						return ecError;
+					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
+						return ecError;
+					
+					/* Writeout */
+					ec_error_t e_result = ecRpcFailed;
+					if (!exmdb_client::write_message(dir, use_name, CP_UTF8,
+						par.cur.fid, dst.get(), &e_result)) {
+						mlog(LV_DEBUG, "ruleproc: write_message failed");
+						return ecRpcFailed;
+					} else if (e_result != ecSuccess) {
+						mlog(LV_DEBUG, "ruleproc: write_message: %s\n", mapi_strerror(e_result));
+						return ecRpcFailed;
+					}
+					if (g_ruleproc_debug)
+						mlog(LV_DEBUG, "ruleproc: OP_COPY/MOVE to %s\n", dir);
 
 					uint64_t change_num = 0;
 					if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
