@@ -951,7 +951,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					// if (pclbin == nullptr)
 					// 	return ecMAPIOOM;
 					
-					char *paddress;
+					// char *paddress;
 					auto &pprops = dst->proplist;
 					if (!pprops.has(PR_LAST_MODIFICATION_TIME)) {
 						auto last_time = rop_util_current_nttime();
@@ -979,8 +979,8 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						pproplist->set(PR_EMAIL_ADDRESS, par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_EMAIL_ADDRESS)) != 0 ||
 						pproplist->set(PR_SMTP_ADDRESS, par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_EMAIL_ADDRESS)) != 0)
 						return ecError;
-					if (pdisplay_name == nullptr)
-						pdisplay_name = paddress;
+					// if (pdisplay_name == nullptr)
+					// 	pdisplay_name = paddress;
 					if (pproplist->set(PR_DISPLAY_NAME, pdisplay_name) != 0 ||
 						pproplist->set(PR_TRANSMITABLE_DISPLAY_NAME, pdisplay_name) != 0)
 						return ecError;
