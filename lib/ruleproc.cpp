@@ -933,6 +933,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (!exmdb_client::allocate_message_id(dir, par.cur.fid, &dst_mid) ||
 						!exmdb_client::allocate_cn(dir, &dst_cn))
 						return ecRpcFailed;
+					mlog(LV_ERR, "PREC: allocate cn  %s", dir);
 
 					// XID zxid{tgt_public ? rop_util_make_domain_guid(user_id) :
 					// 		rop_util_make_user_guid(domain_id), dst_cn};
@@ -953,6 +954,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					
 					// char *paddress;
 					auto &pprops = dst->proplist;
+					mlog(LV_ERR, "PREC: auto &pprops = dst->proplist;  %s", dir);
 					if (!pprops.has(PR_LAST_MODIFICATION_TIME)) {
 						auto last_time = rop_util_current_nttime();
 						auto ret = props.set(PR_LAST_MODIFICATION_TIME, &last_time);
@@ -965,28 +967,34 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					{
 						return ecError;
 					}
-					auto &prcpts = dst->children.prcpts;
-					prcpts = tarray_set_init();
+					// auto &prcpts = dst->children.prcpts;
+					mlog(LV_ERR, "PREC: tarray_set_init  %s", dir);
+					auto prcpts = tarray_set_init();
 					if (prcpts == nullptr)
 						return ecError;
 					tmp_byte = 0;
+					mlog(LV_ERR, "PREC: about to set rcpts internal  %s", dir);
 					dst->set_rcpts_internal(prcpts);
 					tmp_byte = 1;
 					pproplist = prcpts->emplace();
+					mlog(LV_ERR, "PREC: prcpts->emplace()  %s", dir);
 					if (pproplist == nullptr)
 						return ecError;
+					mlog(LV_ERR, "PREC: afterchecking if prcpts is nullptr  %s", dir);
 					if (pproplist->set(PR_ADDRTYPE, par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_ADDRTYPE)) != 0 ||
 						pproplist->set(PR_EMAIL_ADDRESS, par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_EMAIL_ADDRESS)) != 0 ||
 						pproplist->set(PR_SMTP_ADDRESS, par.ctnt->proplist.get<char>(PR_SENT_REPRESENTING_EMAIL_ADDRESS)) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: set ADDRtype  %s", dir);
 					// if (pdisplay_name == nullptr)
 					// 	pdisplay_name = paddress;
 					if (pproplist->set(PR_DISPLAY_NAME, pdisplay_name) != 0 ||
 						pproplist->set(PR_TRANSMITABLE_DISPLAY_NAME, pdisplay_name) != 0)
 						return ecError;
-					
+					mlog(LV_ERR, "PREC: seting PR_DISPLAY_NAME  %s", dir);
 					auto tmp_bin = par.ctnt->proplist.get<const BINARY>(PR_SENT_REPRESENTING_ENTRYID);
 					auto dtypx = DT_MAILUSER;
+					mlog(LV_ERR, "PREC: about to set entryid  %s", dir);
 					if (tmp_bin != nullptr ||
 						pproplist->set(PR_ENTRYID, &tmp_bin) != 0 ||
 						pproplist->set(PR_RECIPIENT_ENTRYID, &tmp_bin) != 0 ||
@@ -1014,6 +1022,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (dst->proplist.set(PR_RESPONSE_REQUESTED, &tmp_byte) != 0 ||
 						dst->proplist.set(PR_REPLY_REQUESTED, &tmp_byte) != 0)
 						return ecError;
+					
 
 					subjectprefix = "Accepted";
 					if (dst->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
@@ -1025,6 +1034,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						return ecError;
 					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out  %s", dir);
 					
 					/* Writeout */
 					ec_error_t e_result = ecRpcFailed;
@@ -1068,7 +1078,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
 						nullptr, CP_ACP, par.cur.mid, &valhdr, &problems))
 						return ecRpcFailed;
-					// dst_mid = 0;
+					dst_mid = 0;
 					BOOL result = false;
 					if (!exmdb_client::allocate_message_id(par.cur.dir.c_str(), cal_eid, &dst_mid))
 						return ecRpcFailed;
