@@ -1038,7 +1038,8 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 3 %s", dir);
-					if(dst->proplist.set(PR_SENT_REPRESENTING_ENTRYID, par.ctnt->proplist.get<const BINARY>(PR_ENTRYID)) != 0)
+					auto tmp_bin_1 = par.ctnt->proplist.get<const BINARY>(PR_ENTRYID);
+					if(dst->proplist.set(PR_SENT_REPRESENTING_ENTRYID, tmp_bin_1) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 4  %s", dir);
 					if(dst->proplist.set(PR_SENT_REPRESENTING_NAME, use_name) != 0)
@@ -1052,7 +1053,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if(dst->proplist.set(PR_SENT_REPRESENTING_SEARCH_KEY, par.ctnt->proplist.get<const BINARY>(PR_RCVD_REPRESENTING_SEARCH_KEY)) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 7 %s", dir);
-					if(dst->proplist.set(PR_SENDER_ENTRYID, par.ctnt->proplist.get<const BINARY>(PR_ENTRYID)) != 0)
+					if(dst->proplist.set(PR_SENDER_ENTRYID, tmp_bin_1) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 8 %s", dir);
 					if(dst->proplist.set(PR_SENDER_EMAIL_ADDRESS, par.ctnt->proplist.get<char>(PR_RECEIVED_BY_EMAIL_ADDRESS)) != 0)
