@@ -1039,8 +1039,8 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 3 %s", dir);
 					auto tmp_bin_1 = par.ctnt->proplist.get<const BINARY>(PR_ENTRYID);
-					if(dst->proplist.set(PR_SENT_REPRESENTING_ENTRYID, tmp_bin_1) != 0)
-						return ecError;
+					// if(dst->proplist.set(PR_SENT_REPRESENTING_ENTRYID, tmp_bin_1) != 0)
+					// 	return ecError;
 					mlog(LV_ERR, "PREC: about to write out 4  %s", dir);
 					if(dst->proplist.set(PR_SENT_REPRESENTING_NAME, use_name) != 0)
 						return ecError;
