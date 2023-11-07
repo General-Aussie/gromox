@@ -1027,34 +1027,45 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					subjectprefix = "Accepted";
 					if (dst->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 1 %s", dir);
 					if (dst->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 						return ecError;
 					std::string concatenatedValue = subjectprefix + ": " + par.ctnt->proplist.get<char>(PR_SUBJECT);
 					// mlog(LV_ERR, "PREC: concatenatedvale: %s", concatenatedValue);
 					if (dst->proplist.set(PR_SUBJECT, concatenatedValue.c_str()) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 2 %s", dir);
 					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 3 %s", dir);
 					if(dst->proplist.set(PR_SENT_REPRESENTING_ENTRYID, par.ctnt->proplist.get<const BINARY>(PR_ENTRYID)) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 4  %s", dir);
 					if(dst->proplist.set(PR_SENT_REPRESENTING_NAME, use_name) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 5 %s", dir);
 					if(dst->proplist.set(PR_SENT_REPRESENTING_EMAIL_ADDRESS, par.ctnt->proplist.get<char>(PR_RCVD_REPRESENTING_EMAIL_ADDRESS)) != 0)
 						return ecError;
-					if(dst->proplist.set(PR_SENT_REPRESENTING_ADDRTYPE, addrtype_rc) != 0)
-						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 6 %s", dir);
+					// if(dst->proplist.set(PR_SENT_REPRESENTING_ADDRTYPE, addrtype_rc) != 0)
+						// return ecError;
 					if(dst->proplist.set(PR_SENT_REPRESENTING_SEARCH_KEY, par.ctnt->proplist.get<const BINARY>(PR_RCVD_REPRESENTING_SEARCH_KEY)) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 7 %s", dir);
 					if(dst->proplist.set(PR_SENDER_ENTRYID, par.ctnt->proplist.get<const BINARY>(PR_ENTRYID)) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 8 %s", dir);
 					if(dst->proplist.set(PR_SENDER_EMAIL_ADDRESS, par.ctnt->proplist.get<char>(PR_RECEIVED_BY_EMAIL_ADDRESS)) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 9  %s", dir);
 					if(dst->proplist.set(PR_SENDER_NAME, par.ctnt->proplist.get<char>(PR_RECEIVED_BY_NAME)) != 0)
 						return ecError;
-					if(dst->proplist.set(PR_SENDER_ADDRTYPE, addrtype_rc) != 0)
-						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 10  %s", dir);
+					// if(dst->proplist.set(PR_SENDER_ADDRTYPE, addrtype_rc) != 0)
+						// return ecError;
 					if(dst->proplist.set(PR_SENDER_SEARCH_KEY, par.ctnt->proplist.get<const BINARY>(PR_RECEIVED_BY_SEARCH_KEY)) != 0)
 						return ecError;
+					mlog(LV_ERR, "PREC: about to write out 11  %s", dir);
 					mlog(LV_ERR, "PREC: about to write out  %s", dir);
 					
 					/* Writeout */
