@@ -4009,3 +4009,45 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
 	mlog(LV_ERR, "W-PREC: conflict not found %d", *out_status);
     return ecSuccess;
 }
+
+static BOOL exmdb_server::message_meeting_reply(const MESSAGE_CONTENT *pmsgctnt, const char *frm, ec_error_t *pb_result)
+{
+	char tmp_buff[256*1024];
+	/* Buffers above may be referenced by pmsgctnt (cu_set_propvals) */	
+	*pb_result = ecSuccess;
+	mlog(LV_ERR, "W-PREC: pb_result set to true");
+
+	auto flag = pmsgctnt->proplist.get<const uint8_t>(PR_ASSOCIATED);
+	if (flag == nullptr || *flag == 0)
+		return TRUE;
+	
+	MAIL imail;
+	mlog(LV_ERR, "W-PREC: setting mail");
+	if (!oxcmail_export(pmsgctnt, false, oxcmail_body::plain_and_html,
+	    &imail, common_util_alloc,
+	    message_get_propids, message_get_propname)) {
+		mlog(LV_ERR, "W-PREC: oxcimail export is false");
+		return FALSE;
+	}
+	mlog(LV_ERR, "W-PREC: oxcimail export is true");
+	auto pmime = imail.get_head();
+	if (pmime == nullptr)
+		return FALSE;
+	pmime->set_field("X-Auto-Response-Suppress", "All");
+	const char *pvalue2 = strchr(frm, '@');
+	snprintf(tmp_buff, sizeof(tmp_buff), "auto-reply@%s", pvalue2 == nullptr ? "system.mail" : pvalue2 + 1);
+	std::vector<std::string> rcpt_list;
+	for (unsigned int i = 0; i < pmsgctnt->children.prcpts->count; ++i) {
+		const auto &r = *pmsgctnt->children.prcpts->pparray[i];
+		TPROPVAL_ARRAY pv = {r.count, r.ppropval};
+		if (!cu_rcpt_to_list(std::move(pv), rcpt_list))
+			return false;
+	}
+	mlog(LV_ERR, "W-PREC: done setting recipients");
+	auto ret = ems_send_mail(&imail, tmp_buff, rcpt_list);
+	if (ret != ecSuccess)
+		mlog(LV_ERR, "E-1188: ems_send_mail: %s", mapi_strerror(ret));
+	*pb_result = ecSuccess;
+	mlog(LV_ERR, "W-PREC: sent message");
+	return TRUE;
+}

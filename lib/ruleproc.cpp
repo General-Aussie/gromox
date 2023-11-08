@@ -1030,9 +1030,8 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					mlog(LV_ERR, "PREC: about to write out 1 %s", dir);
 					if (dst->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 						return ecError;
-					std::string concatenatedValue = subjectprefix + ": " + par.ctnt->proplist.get<char>(PR_SUBJECT);
 					// mlog(LV_ERR, "PREC: concatenatedvale: %s", concatenatedValue);
-					if (dst->proplist.set(PR_SUBJECT, concatenatedValue.c_str()) != 0)
+					if (dst->proplist.set(PR_SUBJECT_PREFIX, subjectprefix) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 2 %s", dir);
 					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
@@ -1070,7 +1069,16 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					mlog(LV_ERR, "PREC: about to write out  %s", dir);
 					
 					/* Writeout */
+					auto frm = par.ev_from;
 					ec_error_t e_result = ecRpcFailed;
+					ec_error_t pb_result = ecRpcFailed;
+					if(!exmdb_client::message_meeting_reply(par.ctnt, frm, pb_result)){
+						mlog(LV_DEBUG, "ruleproc: send_message failed");
+						return ecRpcFailed;
+					} else if (pb_result != ecSuccess) {
+						mlog(LV_DEBUG, "ruleproc: cannot send message: %s\n", mapi_strerror(e_result));
+						return ecRpcFailed;
+					}
 					if (!exmdb_client::write_message(dir, use_name, CP_UTF8,
 						par.cur.fid, dst.get(), &e_result)) {
 						mlog(LV_DEBUG, "ruleproc: write_message failed");
