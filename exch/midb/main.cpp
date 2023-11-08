@@ -1,27 +1,38 @@
 // SPDX-License-Identifier: GPL-2.0-only WITH linking exception
+#include <algorithm>
 #include <cerrno>
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <memory>
+#include <netdb.h>
+#include <pthread.h>
 #include <string>
+#include <typeinfo>
 #include <unistd.h>
 #include <utility>
 #include <vector>
+#include <libHX/io.h>
 #include <libHX/misc.h>
 #include <libHX/option.h>
+#include <libHX/socket.h>
 #include <libHX/string.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <gromox/atomic.hpp>
+#include <gromox/common_types.hpp>
 #include <gromox/config_file.hpp>
 #include <gromox/database.h>
 #include <gromox/defs.h>
 #include <gromox/exmdb_client.hpp>
 #include <gromox/exmdb_rpc.hpp>
 #include <gromox/fileio.h>
+#include <gromox/list_file.hpp>
 #include <gromox/mail_func.hpp>
 #include <gromox/paths.h>
 #include <gromox/scope.hpp>
@@ -31,17 +42,29 @@
 #include "cmd_parser.h"
 #include "common_util.h"
 #include "exmdb_client.h"
-#include "listener.h"
 #include "mail_engine.hpp"
 #include "system_services.hpp"
 
 using namespace gromox;
 
-gromox::atomic_bool g_notify_stop;
+bool (*system_services_get_user_lang)(const char *, char *, size_t);
+bool (*system_services_get_timezone)(const char *, char *, size_t);
+decltype(system_services_get_username_from_id) system_services_get_username_from_id;
+BOOL (*system_services_get_id_from_username)(const char *, unsigned int *);
+decltype(system_services_get_id_from_maildir) system_services_get_id_from_maildir;
+BOOL (*system_services_get_user_ids)(const char *, unsigned int *, unsigned int *, enum display_type *);
+void (*system_services_broadcast_event)(const char*);
+
+static gromox::atomic_bool g_main_notify_stop, g_listener_notify_stop;
 std::shared_ptr<CONFIG_FILE> g_config_file;
 static char *opt_config_file;
 static unsigned int opt_show_version;
 static gromox::atomic_bool g_hup_signalled;
+static uint16_t g_listen_port;
+static char g_listen_ip[40];
+static int g_listen_sockd = -1;
+static std::vector<std::string> g_acl_list;
+static void (*exmdb_client_event_proc)(const char *dir, BOOL table, uint32_t notify_id, const DB_NOTIFY *);
 
 static constexpr HXoption g_options_table[] = {
 	{nullptr, 'c', HXTYPE_STRING, &opt_config_file, nullptr, nullptr, 0, "Config file to read", "FILE"},
@@ -75,9 +98,6 @@ static constexpr cfg_directive midb_cfg_defaults[] = {
 	{"notify_stub_threads_num", "10", CFG_SIZE, "1", "200"},
 	{"rpc_proxy_connection_num", "10", CFG_SIZE, "1", "200"},
 	{"sqlite_debug", "0"},
-	{"sqlite_mmap_size", "0", CFG_SIZE},
-	{"sqlite_synchronous", "off", CFG_BOOL},
-	{"sqlite_wal_mode", "true", CFG_BOOL},
 	{"state_path", PKGSTATEDIR},
 	{"x500_org_name", "Gromox default"},
 	CFG_TABLE_END,
@@ -85,7 +105,7 @@ static constexpr cfg_directive midb_cfg_defaults[] = {
 
 static void term_handler(int signo)
 {
-	g_notify_stop = true;
+	g_main_notify_stop = true;
 }
 
 static bool midb_reload_config(std::shared_ptr<CONFIG_FILE> pconfig)
@@ -109,6 +129,167 @@ static bool midb_reload_config(std::shared_ptr<CONFIG_FILE> pconfig)
 	else
 		g_midb_schema_upgrades = MIDB_UPGRADE_NO;
 	return true;
+}
+
+static void buildenv(const remote_svr &)
+{
+	common_util_build_environment("");
+}
+
+static void event_proc(const char *dir, BOOL thing,
+    uint32_t notify_id, const DB_NOTIFY *notify)
+{
+	common_util_set_maildir(dir);
+	exmdb_client_event_proc(dir, thing, notify_id, notify);
+}
+
+static int exmdb_client_run_front(const char *dir)
+{
+	return exmdb_client_run(dir, EXMDB_CLIENT_SKIP_PUBLIC |
+	       EXMDB_CLIENT_SKIP_REMOTE | EXMDB_CLIENT_ASYNC_CONNECT, buildenv,
+	       common_util_free_environment, event_proc);
+}
+
+void exmdb_client_register_proc(void *pproc)
+{
+	exmdb_client_event_proc = reinterpret_cast<decltype(exmdb_client_event_proc)>(pproc);
+}
+
+static int system_services_run()
+{
+#define E(f, s) do { \
+	(f) = reinterpret_cast<decltype(f)>(service_query((s), "system", typeid(*(f)))); \
+	if ((f) == nullptr) { \
+		mlog(LV_ERR, "system_services: failed to get the \"%s\" service", (s)); \
+		return -1; \
+	} \
+} while (false)
+
+	E(system_services_get_user_lang, "get_user_lang");
+	E(system_services_get_timezone, "get_timezone");
+	E(system_services_get_username_from_id, "get_username_from_id");
+	E(system_services_get_id_from_username, "get_id_from_username");
+	E(system_services_get_id_from_maildir, "get_id_from_maildir");
+	E(system_services_get_user_ids, "get_user_ids");
+	E(system_services_broadcast_event, "broadcast_event");
+	return 0;
+#undef E
+}
+
+static void system_services_stop()
+{
+	service_release("get_user_lang", "system");
+	service_release("get_timezone", "system");
+	service_release("get_username_from_id", "system");
+	service_release("get_id_from_username", "system");
+	service_release("get_id_from_maildir", "system");
+	service_release("get_user_ids", "system");
+	service_release("broadcast_event", "system");
+}
+
+static void *midls_thrwork(void *param)
+{
+	while (!g_listener_notify_stop) {
+		/* wait for an incoming connection */
+		struct sockaddr_storage peer_name;
+		socklen_t addrlen = sizeof(peer_name);
+		auto sockd = accept(g_listen_sockd, reinterpret_cast<struct sockaddr *>(&peer_name), &addrlen);
+		if (sockd == -1)
+			continue;
+
+		char client_hostip[40];
+		auto ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&peer_name),
+		           addrlen, client_hostip, sizeof(client_hostip),
+		           nullptr, 0, NI_NUMERICSERV | NI_NUMERICHOST);
+		if (ret != 0) {
+			mlog(LV_ERR, "getnameinfo: %s", gai_strerror(ret));
+			close(sockd);
+			continue;
+		}
+		if (std::find(g_acl_list.cbegin(), g_acl_list.cend(),
+		    client_hostip) == g_acl_list.cend()) {
+			if (HXio_fullwrite(sockd, "FALSE Access Deny\r\n", 19) < 0)
+				/* ignore */;
+			close(sockd);
+			continue;
+		}
+		auto holder = cmd_parser_get_connection();
+		if (holder.size() == 0) {
+			if (HXio_fullwrite(sockd, "FALSE Maximum Connection Reached!\r\n", 35) < 0)
+				/* ignore */;
+			close(sockd);
+			continue;
+		}
+		auto &conn = holder.front();
+		conn.sockd = sockd;
+		conn.is_selecting = FALSE;
+		if (HXio_fullwrite(sockd, "OK\r\n", 4) < 0)
+			continue;
+		cmd_parser_put_connection(std::move(holder));
+	}
+	return nullptr;
+}
+
+static void listener_init(const char *ip, uint16_t port)
+{
+	if (*ip != '\0')
+		gx_strlcpy(g_listen_ip, ip, std::size(g_listen_ip));
+	else
+		g_listen_ip[0] = '\0';
+	g_listen_port = port;
+	g_listen_sockd = -1;
+	g_listener_notify_stop = true;
+}
+
+static int listener_run(const char *configdir, const char *hosts_allow)
+{
+	g_listen_sockd = HX_inet_listen(g_listen_ip, g_listen_port);
+	if (g_listen_sockd < 0) {
+		mlog(LV_ERR, "listener: failed to create listen socket: %s", strerror(-g_listen_sockd));
+		return -1;
+	}
+	gx_reexec_record(g_listen_sockd);
+	auto &acl = g_acl_list;
+	if (hosts_allow != nullptr)
+		acl = gx_split(hosts_allow, ' ');
+	auto ret = list_file_read_fixedstrings("midb_acl.txt", configdir, acl);
+	if (ret == ENOENT) {
+	} else if (ret != 0) {
+		mlog(LV_ERR, "listener: list_file_initd \"midb_acl.txt\": %s", strerror(errno));
+		close(g_listen_sockd);
+		return -5;
+	}
+	std::sort(acl.begin(), acl.end());
+	acl.erase(std::remove(acl.begin(), acl.end(), ""), acl.end());
+	acl.erase(std::unique(acl.begin(), acl.end()), acl.end());
+	if (acl.size() == 0) {
+		mlog(LV_NOTICE, "system: defaulting to implicit access ACL containing ::1.");
+		acl = {"::1"};
+	}
+	return 0;
+}
+
+static int listener_trigger_accept()
+{
+	pthread_t thr_id;
+
+	g_listener_notify_stop = false;
+	auto ret = pthread_create4(&thr_id, nullptr, midls_thrwork, nullptr);
+	if (ret != 0) {
+		mlog(LV_ERR, "listener: failed to create listener thread: %s", strerror(ret));
+		return -1;
+	}
+	pthread_setname_np(thr_id, "listener");
+	return 0;
+}
+
+static void listener_stop()
+{
+	g_listener_notify_stop = true;
+	if (g_listen_sockd >= 0) {
+		close(g_listen_sockd);
+		g_listen_sockd = -1;
+	}
 }
 
 int main(int argc, const char **argv) try
@@ -165,14 +346,6 @@ int main(int argc, const char **argv) try
 	mlog(LV_INFO, "system: cache interval is %s", temp_buff);
 	
 	gx_sqlite_debug = pconfig->get_ll("sqlite_debug");
-	uint64_t mmap_size = pconfig->get_ll("sqlite_mmap_size");
-	if (0 == mmap_size) {
-		mlog(LV_INFO, "system: sqlite mmap_size is disabled");
-	} else {
-		HX_unit_size(temp_buff, std::size(temp_buff), mmap_size, 1024, 0);
-		mlog(LV_INFO, "system: sqlite mmap_size is %s", temp_buff);
-	}
-	
 	if (0 != getrlimit(RLIMIT_NOFILE, &rl)) {
 		mlog(LV_ERR, "getrlimit: %s", strerror(errno));
 	} else {
@@ -201,10 +374,7 @@ int main(int argc, const char **argv) try
 	listener_init(listen_ip, listen_port);
 	auto cl_3 = make_scope_exit(listener_stop);
 	mail_engine_init(g_config_file->get_value("default_charset"),
-		g_config_file->get_value("x500_org_name"), table_size,
-		parse_bool(g_config_file->get_value("sqlite_synchronous")) ? TRUE : false,
-		parse_bool(g_config_file->get_value("sqlite_wal_mode")) ? TRUE : false,
-		mmap_size);
+		g_config_file->get_value("x500_org_name"), table_size);
 	auto cl_5 = make_scope_exit(mail_engine_stop);
 
 	cmd_parser_init(threads_num, SOCKET_TIMEOUT, cmd_debug);
@@ -254,7 +424,7 @@ int main(int argc, const char **argv) try
 	sigaction(SIGINT, &sact, nullptr);
 	sigaction(SIGTERM, &sact, nullptr);
 	mlog(LV_NOTICE, "system: MIDB is now running");
-	while (!g_notify_stop) {
+	while (!g_main_notify_stop) {
 		sleep(1);
 		if (g_hup_signalled.exchange(false)) {
 			midb_reload_config(nullptr);

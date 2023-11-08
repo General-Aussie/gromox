@@ -274,7 +274,7 @@ static void *midcp_thrwork(void *param)
 			if (buffer[i] != '\r' || buffer[i+1] != '\n')
 				continue;
 			if (4 == i && 0 == strncasecmp(buffer, "QUIT", 4)) {
-				if (HXio_fullwrite(pconnection->sockd, "BYE\r\n", 5) != 5)
+				if (HXio_fullwrite(pconnection->sockd, "BYE\r\n", 5) < 0)
 					/* ignore */;
 				co_hold.lock();
 				gc.splice(gc.end(), g_connlist_active, pconnection);
@@ -283,7 +283,7 @@ static void *midcp_thrwork(void *param)
 
 			argc = cmd_parser_generate_args(buffer, i, argv);
 			if (argc < 2) {
-				if (HXio_fullwrite(pconnection->sockd, "FALSE 1\r\n", 9) != 9) {
+				if (HXio_fullwrite(pconnection->sockd, "FALSE 1\r\n", 9) < 0) {
 					co_hold.lock();
 					gc.splice(gc.end(), g_connlist_active, pconnection);
 					goto NEXT_LOOP;
@@ -334,9 +334,8 @@ static int cmd_parser_generate_args(char* cmd_line, int cmd_len, char** argv)
 	last_space = cmd_line;
 	while (*ptr != '\0') {
 		if ('{' == *ptr) {
-			if ('}' != cmd_line[cmd_len - 1]) {
+			if (cmd_line[cmd_len-1] != '}')
 				return 0;
-			}
 			argv[argc] = ptr;
 			cmd_line[cmd_len] = '\0';
 			argc ++;

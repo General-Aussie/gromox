@@ -34,6 +34,7 @@
 #include <gromox/midb.hpp>
 #include <gromox/mjson.hpp>
 #include <gromox/range_set.hpp>
+#include <gromox/simple_tree.hpp>
 #include <gromox/textmaps.hpp>
 #include <gromox/util.hpp>
 #include <gromox/xarray2.hpp>
@@ -47,14 +48,155 @@ namespace exmdb_client = exmdb_client_remote;
 using LLU = unsigned long long;
 using mdi_list = std::vector<std::string>; /* message data item (RFC 3501 §6.4.5) */
 
+namespace {
+
+struct dir_tree {
+	dir_tree(alloc_limiter<DIR_NODE> *);
+	~dir_tree();
+	void load_from_memfile(const std::vector<std::string> &);
+	DIR_NODE *match(const char *path);
+	static DIR_NODE *get_child(DIR_NODE *);
+
+	SIMPLE_TREE tree{};
+	alloc_limiter<DIR_NODE> *ppool = nullptr;
+};
+using DIR_TREE = dir_tree;
+using DIR_TREE_ENUM = void (*)(DIR_NODE *, void*);
+
 enum {
 	TYPE_WILDS = 1,
 	TYPE_WILDP
 };
 
+}
+
 static constexpr const char *g_folder_list[] = {"draft", "sent", "trash", "junk"};
 /* RFC 6154 says \Junk, but Thunderbird evaluates \Spam */
 static constexpr const char *g_xproperty_list[] = {"\\Drafts", "\\Sent", "\\Trash", "\\Junk \\Spam"};
+
+static void dir_tree_enum_delete(SIMPLE_TREE_NODE *pnode)
+{
+	auto pdir = static_cast<DIR_NODE *>(pnode->pdata);
+	pdir->ppool->put(pdir);
+}
+
+dir_tree::dir_tree(alloc_limiter<DIR_NODE> *a) : ppool(a)
+{}
+
+void dir_tree::load_from_memfile(const std::vector<std::string> &pfile)
+{
+	auto ptree = this;
+	char *ptr1, *ptr2;
+	char temp_path[4096 + 1];
+	SIMPLE_TREE_NODE *pnode, *pnode_parent;
+
+	auto proot = ptree->tree.get_root();
+	if (NULL == proot) {
+		auto pdir = ptree->ppool->get();
+		pdir->node.pdata = pdir;
+		pdir->name[0] = '\0';
+		pdir->b_loaded = TRUE;
+		pdir->ppool = ptree->ppool;
+		ptree->tree.set_root(&pdir->node);
+		proot = &pdir->node;
+	}
+
+	for (const auto &pfile_path : pfile) {
+		gx_strlcpy(temp_path, pfile_path.c_str(), std::size(temp_path));
+		auto len = strlen(temp_path);
+		pnode = proot;
+		if (len == 0 || temp_path[len-1] != '/') {
+			temp_path[len++] = '/';
+			temp_path[len] = '\0';
+		}
+		ptr1 = temp_path;
+		while ((ptr2 = strchr(ptr1, '/')) != NULL) {
+			*ptr2 = '\0';
+			pnode_parent = pnode;
+			pnode = pnode->get_child();
+			if (NULL != pnode) {
+				do {
+					auto pdir = static_cast<DIR_NODE *>(pnode->pdata);
+					if (strcmp(pdir->name, ptr1) == 0)
+						break;
+				} while ((pnode = pnode->get_sibling()) != nullptr);
+			}
+
+			if (NULL == pnode) {
+				auto pdir = ptree->ppool->get();
+				pdir->node.pdata = pdir;
+				gx_strlcpy(pdir->name, ptr1, std::size(pdir->name));
+				pdir->b_loaded = FALSE;
+				pdir->ppool = ptree->ppool;
+				pnode = &pdir->node;
+				ptree->tree.add_child(pnode_parent, pnode,
+					SIMPLE_TREE_ADD_LAST);
+			}
+			ptr1 = ptr2 + 1;
+		}
+		static_cast<DIR_NODE *>(pnode->pdata)->b_loaded = TRUE;
+	}
+}
+
+static void dir_tree_clear(DIR_TREE *ptree)
+{
+	auto pnode = ptree->tree.get_root();
+	if (pnode != nullptr)
+		ptree->tree.destroy_node(pnode, dir_tree_enum_delete);
+}
+
+DIR_NODE *dir_tree::match(const char *path)
+{
+	auto ptree = this;
+	int len;
+	DIR_NODE *pdir = nullptr;
+	char *ptr1, *ptr2;
+	char temp_path[4096 + 1];
+
+	auto pnode = ptree->tree.get_root();
+	if (pnode == nullptr)
+		return NULL;
+	if (*path == '\0')
+		return static_cast<DIR_NODE *>(pnode->pdata);
+	len = strlen(path);
+	if (len >= 4096)
+		return NULL;
+	memcpy(temp_path, path, len);
+	if (temp_path[len-1] != '/')
+		temp_path[len++] = '/';
+	temp_path[len] = '\0';
+	
+	ptr1 = temp_path;
+	while ((ptr2 = strchr(ptr1, '/')) != NULL) {
+		*ptr2 = '\0';
+		pnode = pnode->get_child();
+		if (pnode == nullptr)
+			return NULL;
+		do {
+			pdir = static_cast<DIR_NODE *>(pnode->pdata);
+			if (strcmp(pdir->name, ptr1) == 0)
+				break;
+		} while ((pnode = pnode->get_sibling()) != nullptr);
+		if (pnode == nullptr)
+			return NULL;
+		ptr1 = ptr2 + 1;
+	}
+	return pdir;
+}
+
+DIR_NODE *dir_tree::get_child(DIR_NODE* pdir)
+{
+	auto pnode = pdir->node.get_child();
+	return pnode != nullptr ? static_cast<DIR_NODE *>(pnode->pdata) : nullptr;
+}
+
+dir_tree::~dir_tree()
+{
+	auto ptree = this;
+	dir_tree_clear(ptree);
+	ptree->tree.clear();
+	ptree->ppool = NULL;
+}
 
 static inline bool special_folder(const char *name)
 {
@@ -2139,7 +2281,7 @@ int imap_cmd_parser_append(int argc, char **argv, IMAP_CONTEXT *pcontext)
 		             std::to_string(imap_parser_get_sequence_ID()) + "." +
 		             znul(g_config_file->get_value("host_id"));
 		eml_path = std::string(pcontext->maildir) + "/eml/" + mid_string;
-		fd = open(eml_path.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666);
+		fd = open(eml_path.c_str(), O_CREAT | O_RDWR | O_TRUNC, FMODE_PRIVATE);
 	} catch (const std::bad_alloc &) {
 		mlog(LV_ERR, "E-1456: ENOMEM");
 	}
@@ -2247,7 +2389,7 @@ static int imap_cmd_parser_append_begin2(int argc, char **argv, IMAP_CONTEXT *pc
 	} catch (const std::bad_alloc &) {
 		return 1918 | DISPATCH_BREAK;
 	}
-	int fd = open(pcontext->file_path.c_str(), O_CREAT|O_RDWR|O_TRUNC, 0666);
+	int fd = open(pcontext->file_path.c_str(), O_CREAT | O_RDWR | O_TRUNC, FMODE_PRIVATE);
 	if (fd == -1)
 		return 1909 | DISPATCH_BREAK;
 	len = sizeof(uint32_t);
@@ -2368,7 +2510,7 @@ static int imap_cmd_parser_append_end2(int argc, char **argv, IMAP_CONTEXT *pcon
 	int fd = -1;
 	try {
 		eml_path = std::string(pcontext->maildir) + "/eml/" + pcontext->mid;
-		fd = open(eml_path.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666);
+		fd = open(eml_path.c_str(), O_CREAT | O_RDWR | O_TRUNC, FMODE_PRIVATE);
 	} catch (const std::bad_alloc &) {
 		mlog(LV_ERR, "E-1460: ENOMEM");
 	}

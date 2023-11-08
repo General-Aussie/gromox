@@ -2,25 +2,36 @@
 #include <cerrno>
 #include <chrono>
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <memory>
+#include <netdb.h>
+#include <pthread.h>
 #include <string>
+#include <typeinfo>
 #include <unistd.h>
 #include <utility>
 #include <vector>
+#include <libHX/io.h>
 #include <libHX/misc.h>
 #include <libHX/option.h>
+#include <libHX/socket.h>
 #include <libHX/string.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <gromox/atomic.hpp>
 #include <gromox/config_file.hpp>
 #include <gromox/contexts_pool.hpp>
-#include <gromox/fileio.h>
+#include <gromox/defs.h>
 #include <gromox/exmdb_client.hpp>
 #include <gromox/exmdb_rpc.hpp>
+#include <gromox/fileio.h>
 #include <gromox/paths.h>
 #include <gromox/scope.hpp>
 #include <gromox/svc_loader.hpp>
@@ -30,12 +41,29 @@
 
 using namespace gromox;
 
+#define E(s) decltype(system_services_ ## s) system_services_ ## s;
+E(judge_ip)
+E(judge_user)
+E(add_user_into_temp_list)
+E(auth_login)
+E(auth_meta)
+E(list_mail)
+E(delete_mail)
+E(broadcast_event)
+#undef E
+
 gromox::atomic_bool g_notify_stop;
 std::shared_ptr<CONFIG_FILE> g_config_file;
 static char *opt_config_file;
 static gromox::atomic_bool g_hup_signalled;
 static thread_local std::unique_ptr<alloc_context> g_alloc_mgr;
 static thread_local unsigned int g_amgr_refcount;
+static pthread_t g_thr_id;
+static gromox::atomic_bool g_stop_accept;
+static std::string g_listener_addr;
+static int g_listener_sock = -1, g_listener_ssl_sock = -1;
+uint16_t g_listener_port, g_listener_ssl_port;
+static pthread_t g_ssl_thr_id;
 
 static struct HXoption g_options_table[] = {
 	{nullptr, 'c', HXTYPE_STRING, &opt_config_file, nullptr, nullptr, 0, "Config file to read", "FILE"},
@@ -102,6 +130,238 @@ static bool pop3_reload_config(std::shared_ptr<CONFIG_FILE> pconfig)
 	mlog_init(pconfig->get_value("pop3_log_file"), pconfig->get_ll("pop3_log_level"));
 	g_popcmd_debug = pconfig->get_ll("pop3_cmd_debug");
 	return true;
+}
+
+static int system_services_run()
+{
+#define E(f, s) do { \
+	(f) = reinterpret_cast<decltype(f)>(service_query((s), "system", typeid(*(f)))); \
+	if ((f) == nullptr) { \
+		printf("[%s]: failed to get the \"%s\" service\n", "system_services", (s)); \
+		return -1; \
+	} \
+} while (false)
+#define E2(f, s) \
+	((f) = reinterpret_cast<decltype(f)>(service_query((s), "system", typeid(*(f)))))
+
+	E2(system_services_judge_ip, "ip_filter_judge");
+	E2(system_services_judge_user, "user_filter_judge");
+	E2(system_services_add_user_into_temp_list, "user_filter_add");
+	E(system_services_auth_login, "auth_login_gen");
+	E(system_services_auth_meta, "mysql_auth_meta");
+	E(system_services_list_mail, "list_mail");
+	E(system_services_delete_mail, "delete_mail");
+	E2(system_services_broadcast_event, "broadcast_event");
+	return 0;
+#undef E
+#undef E2
+}
+
+static void system_services_stop()
+{
+	service_release("ip_filter_judge", "system");
+	service_release("user_filter_judge", "system");
+	service_release("user_filter_add", "system");
+	service_release("mysql_auth_meta", "system");
+	service_release("auth_login_gen", "system");
+	service_release("list_mail", "system");
+	service_release("delete_mail", "system");
+	service_release("broadcast_event", "system");
+}
+
+static void *p3ls_thrwork(void *arg)
+{
+	const bool use_tls = reinterpret_cast<uintptr_t>(arg);
+	
+	while (true) {
+		struct sockaddr_storage fact_addr, client_peer;
+		socklen_t addrlen = sizeof(client_peer);
+		char client_hostip[40], client_txtport[8], server_hostip[40];
+		/* wait for an incoming connection */
+		auto sockd2 = accept(use_tls ? g_listener_ssl_sock : g_listener_sock,
+		              reinterpret_cast<struct sockaddr *>(&client_peer), &addrlen);
+		if (g_stop_accept) {
+			if (sockd2 >= 0)
+				close(sockd2);
+			return nullptr;
+		}
+		if (sockd2 == -1)
+			continue;
+		int ret = getnameinfo(reinterpret_cast<sockaddr *>(&client_peer),
+		          addrlen, client_hostip, sizeof(client_hostip),
+		          client_txtport, sizeof(client_txtport),
+		          NI_NUMERICHOST | NI_NUMERICSERV);
+		if (ret != 0) {
+			printf("getnameinfo: %s\n", gai_strerror(ret));
+			close(sockd2);
+			continue;
+		}
+		addrlen = sizeof(fact_addr); 
+		ret = getsockname(sockd2, reinterpret_cast<sockaddr *>(&fact_addr), &addrlen);
+		if (ret != 0) {
+			printf("getsockname: %s\n", strerror(errno));
+			close(sockd2);
+			continue;
+		}
+		ret = getnameinfo(reinterpret_cast<sockaddr *>(&fact_addr),
+		      addrlen, server_hostip, sizeof(server_hostip),
+		      nullptr, 0, NI_NUMERICHOST | NI_NUMERICSERV);
+		if (ret != 0) {
+			printf("getnameinfo: %s\n", gai_strerror(ret));
+			close(sockd2);
+			continue;
+		}
+		uint16_t client_port = strtoul(client_txtport, nullptr, 0);
+		if (fcntl(sockd2, F_SETFL, O_NONBLOCK) < 0)
+			mlog(LV_WARN, "W-1405: fctnl: %s", strerror(errno));
+		static constexpr int flag = 1;
+		if (setsockopt(sockd2, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag)) < 0)
+			mlog(LV_WARN, "W-1339: setsockopt: %s", strerror(errno));
+		auto ctx = static_cast<POP3_CONTEXT *>(contexts_pool_get_context(CONTEXT_FREE));
+		/* there's no context available in contexts pool, close the connection*/
+		if (ctx == nullptr) {
+			/* 421 <domain> Service not available */
+			size_t sl = 0;
+			auto str = resource_get_pop3_code(1713, 1, &sl);
+			auto str2 = resource_get_pop3_code(1713, 2, &sl);
+			auto host_ID = znul(g_config_file->get_value("host_id"));
+			char buff[1024];
+			auto len = snprintf(buff, std::size(buff), "%s%s%s",
+			           str, host_ID, str2);
+			if (HXio_fullwrite(sockd2, buff, len) < 0)
+				/* ignore */;
+			close(sockd2);
+			continue;
+		}
+		ctx->type = CONTEXT_CONSTRUCTING;
+		/* pass the client ipaddr into the ipaddr filter */
+		std::string reason;
+		if (system_services_judge_ip != nullptr &&
+		    !system_services_judge_ip(client_hostip, reason)) {
+			/* access denied */
+			size_t sl = 0;
+			auto str = resource_get_pop3_code(1712, 1, &sl);
+			auto str2 = resource_get_pop3_code(1712, 2, &sl);
+			char buff[1024];
+			auto len = snprintf(buff, std::size(buff), "%s%s%s",
+			           str, client_hostip, str2);
+			if (HXio_fullwrite(sockd2, buff, len) < 0)
+				/* ignore */;
+			mlog(LV_DEBUG, "Connection %s is denied by ipaddr filter",
+				client_hostip);
+			close(sockd2);
+			/* release the context */
+			contexts_pool_put_context(ctx, CONTEXT_FREE);
+			continue;
+		}
+
+		if (!use_tls) {
+			/* +OK <domain> Service ready */
+			size_t sl = 0;
+			auto str = resource_get_pop3_code(1711, 1, &sl);
+			auto str2 = resource_get_pop3_code(1711, 2, &sl);
+			auto host_ID = znul(g_config_file->get_value("host_id"));
+			char buff[1024];
+			auto len = snprintf(buff, std::size(buff), "%s%s%s",
+			           str, host_ID, str2);
+			if (HXio_fullwrite(sockd2, buff, len) < 0)
+				/* ignore */;
+		}
+		/* construct the context object */
+		ctx->connection.last_timestamp = tp_now();
+		ctx->connection.sockd          = sockd2;
+		ctx->is_stls                   = use_tls;
+		ctx->connection.client_port    = client_port;
+		ctx->connection.server_port    = use_tls ? g_listener_ssl_port : g_listener_port;
+		gx_strlcpy(ctx->connection.client_ip, client_hostip, std::size(ctx->connection.client_ip));
+		gx_strlcpy(ctx->connection.server_ip, server_hostip, std::size(ctx->connection.server_ip));
+		/*
+		 * Valid the context and wake up one thread if there are some threads
+		 * block on the condition variable.
+		 */
+		ctx->polling_mask = POLLING_READ;
+		contexts_pool_put_context(ctx, CONTEXT_POLLING);
+	}
+	return nullptr;
+}
+
+static void listener_init(const char *addr, uint16_t port, uint16_t ssl_port)
+{
+	g_listener_addr = addr;
+	g_listener_port = port;
+	g_listener_ssl_port = ssl_port;
+	g_stop_accept = false;
+}
+
+static int listener_run()
+{
+	g_listener_sock = HX_inet_listen(g_listener_addr.c_str(), g_listener_port);
+	if (g_listener_sock < 0) {
+		printf("[listener]: failed to create socket [*]:%hu: %s\n",
+		       g_listener_port, strerror(-g_listener_sock));
+		return -1;
+	}
+	gx_reexec_record(g_listener_sock);
+	if (g_listener_ssl_port > 0) {
+		g_listener_ssl_sock = HX_inet_listen(g_listener_addr.c_str(), g_listener_ssl_port);
+		if (g_listener_ssl_sock < 0) {
+			printf("[listener]: failed to create socket [*]:%hu: %s\n",
+			       g_listener_ssl_port, strerror(-g_listener_ssl_sock));
+			return -1;
+		}
+		gx_reexec_record(g_listener_ssl_sock);
+	}
+	return 0;
+}
+
+static int listener_trigger_accept()
+{
+	auto ret = pthread_create4(&g_thr_id, nullptr, p3ls_thrwork,
+	           reinterpret_cast<void *>(uintptr_t(false)));
+	if (ret != 0) {
+		printf("[listener]: failed to create listener thread: %s\n", strerror(ret));
+		return -1;
+	}
+	pthread_setname_np(g_thr_id, "accept");
+	if (g_listener_ssl_port > 0) {
+		ret = pthread_create4(&g_ssl_thr_id, nullptr, p3ls_thrwork,
+		      reinterpret_cast<void *>(uintptr_t(true)));
+		if (ret != 0) {
+			printf("[listener]: failed to create listener thread: %s\n", strerror(ret));
+			return -2;
+		}
+		pthread_setname_np(g_ssl_thr_id, "tls_accept");
+	}
+	return 0;
+}
+
+static void listener_stop_accept()
+{
+	g_stop_accept = true;
+	if (g_listener_sock >= 0)
+		shutdown(g_listener_sock, SHUT_RDWR); /* closed in listener_stop */
+	if (!pthread_equal(g_thr_id, {})) {
+		pthread_kill(g_thr_id, SIGALRM);
+		pthread_join(g_thr_id, NULL);
+	}
+	if (g_listener_ssl_sock >= 0)
+		shutdown(g_listener_ssl_sock, SHUT_RDWR);
+	if (!pthread_equal(g_ssl_thr_id, {})) {
+		pthread_kill(g_ssl_thr_id, SIGALRM);
+		pthread_join(g_ssl_thr_id, NULL);
+	}
+}
+
+static void listener_stop()
+{
+	if (g_listener_sock >= 0) {
+		close(g_listener_sock);
+		g_listener_sock = -1;
+	}
+	if (g_listener_ssl_sock >= 0) {
+		close(g_listener_ssl_sock);
+		g_listener_ssl_sock = -1;
+	}
 }
 
 void xrpc_build_env()

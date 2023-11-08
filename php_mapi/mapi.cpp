@@ -10,6 +10,8 @@
 #include <gromox/defs.h>
 #include <gromox/mapidefs.h>
 #include <gromox/paths.h>
+#include <gromox/rtf.hpp>
+#include <gromox/rtfcp.hpp>
 #include <gromox/safeint.hpp>
 #include <gromox/scope.hpp>
 #include <gromox/timezone.hpp>
@@ -399,6 +401,10 @@ PHP_INI_END()
 
 static PHP_MINIT_FUNCTION(mapi)
 {
+	if (!rtf_init_library()) {
+		fprintf(stderr, "rtf_init_library failed\n");
+		return FAILURE;
+	}
 	le_mapi_session = zend_register_list_destructors_ex(
 		mapi_resource_dtor, NULL, name_mapi_session, module_number);
 	le_mapi_addressbook = zend_register_list_destructors_ex(
@@ -2881,73 +2887,48 @@ static ZEND_FUNCTION(mapi_getnamesfromids)
 static ZEND_FUNCTION(mapi_decompressrtf)
 {
 	ZCL_MEMORY;
-	pid_t pid;
-	int status, offset, bufflen, readlen;
-	size_t rtflen = 0;
-	char *pbuff, *rtfbuffer, *args[2];
-	int pipes_in[2] = {-1, -1}, pipes_out[2] = {-1, -1};
+	zval *firstarg = nullptr;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS(),
-		"s", &rtfbuffer, &rtflen) == FAILURE || NULL ==
-		rtfbuffer || 0 == rtflen)
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "z", &firstarg) == FAILURE)
 		pthrow(ecInvalidParam);
-	if (-1 == pipe(pipes_in))
-		pthrow(ecError);
-	if (-1 == pipe(pipes_out)) {
-		close(pipes_in[0]);
-		close(pipes_in[1]);
-		pthrow(ecError);
+	auto deref = firstarg;
+	ZVAL_DEREF(deref);
+	if (Z_TYPE_P(deref) != IS_STRING || Z_STRLEN_P(deref) < 16) {
+		MAPI_G(hr) = ecSuccess;
+		ZVAL_COPY(return_value, firstarg);
+		return;
 	}
-	pid = fork();
-	switch (pid) {
-	case 0:
-		close(pipes_in[1]);
-		close(pipes_out[0]);
-		close(0);
-		close(1);
-		dup2(pipes_in[0], 0);
-		dup2(pipes_out[1], 1);
-		close(pipes_in[0]);
-		close(pipes_out[1]);
-		args[0] = const_cast<char *>("rtf2html");
-		args[1] = NULL;
-		execv(PKGLIBEXECDIR "/rtf2html", args);
-		_exit(-1);
-	 case -1:
-		close(pipes_in[0]);
-		close(pipes_in[1]);
-		close(pipes_out[0]);
-		close(pipes_out[1]);
-		pthrow(ecError);
-	default:
-		close(pipes_in[0]);
-		close(pipes_out[1]);
-		break;
+	static constexpr char mela[] = {0x4d,0x45,0x4c,0x41};
+	static constexpr char lzfu[] = {0x4c,0x5a,0x46,0x75};
+	auto magic = Z_STRVAL_P(deref) + 8;
+	if (memcmp(magic, mela, 4) != 0 &&
+	    memcmp(magic, lzfu, 4) != 0) {
+		MAPI_G(hr) = ecSuccess;
+		ZVAL_COPY(return_value, firstarg);
+		return;
 	}
-	write(pipes_in[1], rtfbuffer, rtflen);
-	close(pipes_in[1]);
-	offset = 0;
-	bufflen = 64*1024;
-	pbuff = sta_malloc<char>(bufflen);
-	if (NULL == pbuff) {
-		close(pipes_out[0]);
+
+	BINARY rtf_bin;
+	rtf_bin.cb = Z_STRLEN_P(deref);
+	rtf_bin.pc = Z_STRVAL_P(deref);
+	ssize_t unc_size = rtfcp_uncompressed_size(&rtf_bin);
+	if (unc_size < 0)
+		/* Input does not look like RTFCP (MELA or LZFU) */
+		pthrow(ecInvalidParam);
+	auto rtf_blob = sta_malloc<char>(unc_size);
+	if (rtf_blob == nullptr)
 		pthrow(ecMAPIOOM);
-	}
-	while ((readlen = read(pipes_out[0],
-		pbuff, bufflen - offset)) > 0) {
-		offset += readlen;
-		if (offset == bufflen) {
-			bufflen *= 2;
-			pbuff = sta_realloc<char>(pbuff, bufflen);
-			if (NULL == pbuff) {
-				close(pipes_out[0]);
-				pthrow(ecMAPIOOM);
-			}
-		}
-	}
-	waitpid(pid, &status, 0);
-	close(pipes_out[0]);
-	RETVAL_STRINGL(pbuff, offset);
+	auto cl_0 = make_scope_exit([&]() { efree(rtf_blob); });
+	size_t rtf_len = unc_size;
+	if (!rtfcp_uncompress(&rtf_bin, rtf_blob, &rtf_len))
+		pthrow(ecError);
+	std::unique_ptr<ATTACHMENT_LIST, mc_delete> atxlist(attachment_list_init());
+	if (atxlist == nullptr)
+		pthrow(ecMAPIOOM);
+	std::string htmlout;
+	if (!rtf_to_html(rtf_blob, rtf_len, "utf-8", htmlout, atxlist.get()))
+		pthrow(ecError);
+	RETVAL_STRINGL(htmlout.data(), htmlout.size());
 	MAPI_G(hr) = ecSuccess;
 }
 

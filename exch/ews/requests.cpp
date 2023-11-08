@@ -4,7 +4,7 @@
 
 #include <algorithm>
 #include <fstream>
-
+#include <variant>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <tinyxml2.h>
@@ -20,10 +20,13 @@
 namespace gromox::EWS::Requests
 {
 
+using std::optional;
+using std::string;
+using std::min;
+using std::max;
 using namespace gromox;
 using namespace gromox::EWS::Exceptions;
 using namespace gromox::EWS::Structures;
-using namespace std;
 using namespace tinyxml2;
 
 using Clock = time_point::clock;
@@ -56,26 +59,26 @@ static inline std::string &tolower(std::string &str)
  */
 optional<string> readMessageBody(const std::string& path) try
 {
-	ifstream ifs(path, ios::in | ios::ate | ios::binary);
+	std::ifstream ifs(path, std::ios::in | std::ios::ate | std::ios::binary);
 	if(!ifs.is_open())
-		return nullopt;
+		return std::nullopt;
 	size_t totalLength = ifs.tellg();
-	ifs.seekg(ios::beg);
+	ifs.seekg(std::ios::beg);
 	while(!ifs.eof())
 	{
-		ifs.ignore(numeric_limits<std::streamsize>::max(), '\r');
+		ifs.ignore(std::numeric_limits<std::streamsize>::max(), '\r');
 		if(ifs.get() == '\n' && ifs.get() == '\r' && ifs.get() == '\n')
 			break;
 	}
 	if(ifs.eof())
-		return nullopt;
+		return std::nullopt;
 	size_t headerLenght = ifs.tellg();
 	string content(totalLength-headerLenght, 0);
 	ifs.read(content.data(), content.size());
 	return content;
 } catch (const std::exception &e) {
 	mlog(LV_ERR, "[ews] %s\n", e.what());
-	return nullopt;
+	return std::nullopt;
 }
 
 /**
@@ -92,12 +95,10 @@ void writeMessageBody(const std::string& path, const optional<tReplyBody>& reply
 		return (void) unlink(path.c_str());
 	static const char header[] = "Content-Type: text/html;\r\n\tcharset=\"utf-8\"\r\n\r\n";
 	auto& content = *reply->Message;
-	ofstream file(path, ios::binary);
+	std::ofstream file(path, std::ios::binary); /* FMODE_PUBLIC */
 	file.write(header, std::size(header)-1);
 	file.write(content.c_str(), content.size());
 	file.close();
-	if(chmod(path.c_str(), 0666))
-		mlog(LV_WARN, "[ews]: failed to chmod %s: %s", path.c_str(), strerror(errno));
 }
 
 } //anonymous namespace
@@ -262,6 +263,7 @@ void process(mDeleteItemRequest&& request, XMLElement* response, const EWSContex
 
 	for(const tItemId& itemId : request.ItemIds) try
 	{
+		ctx.assertIdType(itemId.type, tItemId::ID_ITEM);
 		sMessageEntryId meid(itemId.Id.data(), itemId.Id.size());
 		sFolderSpec parent = ctx.resolveFolder(meid);
 		std::string dir = ctx.getDir(parent);
@@ -653,6 +655,45 @@ void process(mGetUserOofSettingsRequest&& request, XMLElement* response, const E
 }
 
 /**
+ * @brief      Process GetUserAvailabilityRequest
+ *
+ * @param      request   Request data
+ * @param      response  XMLElement to store response in
+ * @param      ctx       Request context
+ */
+void process(mGetUserPhotoRequest&& request, XMLElement* response, EWSContext& ctx)
+{
+	ctx.experimental();
+
+	response->SetName("m:GetUserPhotoResponse");
+
+	mGetUserPhotoResponse data;
+
+	try {
+		std::string dir = ctx.get_maildir(request.Email);
+		PROPERTY_NAME photo{MNID_STRING, PSETID_GROMOX, 0, const_cast<char*>("photo")};
+		PROPNAME_ARRAY propNames{1, &photo};
+		PROPID_ARRAY propIds = ctx.getNamedPropIds(dir, propNames);
+		if(propIds.count != 1)
+			throw std::runtime_error("failed to get photo property id");
+		uint32_t tag = PROP_TAG(PT_BINARY, *propIds.ppropid);
+		PROPTAG_ARRAY tags{1, &tag};
+		TPROPVAL_ARRAY props;
+		ctx.plugin().exmdb.get_store_properties(dir.c_str(), CP_ACP, &tags, & props);
+		const BINARY* photodata = props.get<BINARY>(tag);
+		if(photodata && photodata->cb)
+			data.PictureData = photodata;
+		else
+			ctx.code(http_status::not_found);
+	} catch(std::exception& err){
+		ctx.code(http_status::not_found);
+		mlog(LV_WARN, "[ews#%d] Failed to load user photo: %s", ctx.ID(), err.what());
+	}
+	data.success();
+	data.serialize(response);
+}
+
+/**
  * @brief      Process CopyFolder or MoveFolder
  *
  * @param      request   Request data
@@ -724,6 +765,7 @@ void process(const mBaseMoveCopyItem& request, XMLElement* response, const EWSCo
 	for(const tItemId& itemId : request.ItemIds) try {
 		if(!dstAccess)
 			throw EWSError::AccessDenied(E3184);
+		ctx.assertIdType(itemId.type, tItemId::ID_ITEM);
 		sMessageEntryId meid(itemId.Id.data(), itemId.Id.size());
 		sFolderSpec sourceFolder = ctx.resolveFolder(meid);
 		if(sourceFolder.target != dstFolder.target)
@@ -782,7 +824,7 @@ void process(mSetUserOofSettingsRequest&& request, XMLElement* response, const E
 		throw DispatchError(E3009(OofSettings.ExternalAudience));
 
 	std::string filename = maildir+"/config/autoreply.cfg";
-	ofstream file(filename);
+	std::ofstream file(filename); /* FMODE_PUBLIC */
 	file << "oof_state = " << oof_state << "\n"
 	     << "allow_external_oof = " << allow_external_oof << "\n";
 	if(allow_external_oof)
@@ -791,8 +833,6 @@ void process(mSetUserOofSettingsRequest&& request, XMLElement* response, const E
 		file << "start_time = " << Clock::to_time_t(OofSettings.Duration->StartTime) << "\n"
 		     << "end_time = " << Clock::to_time_t(OofSettings.Duration->EndTime) << "\n";
 	file.close();
-	if(chmod(filename.c_str(), 0666))
-		mlog(LV_WARN, "[ews]: failed to chmod %s: %s", filename.c_str(), strerror(errno));
 
 	writeMessageBody(maildir+"/config/internal-reply", OofSettings.InternalReply);
 	writeMessageBody(maildir+"/config/external-reply", OofSettings.ExternalReply);
@@ -1010,6 +1050,8 @@ void process(mGetItemRequest&& request, XMLElement* response, const EWSContext& 
 	data.ResponseMessages.reserve(request.ItemIds.size());
 	sShape shape(request.ItemShape);
 	for(auto& itemId : request.ItemIds) try {
+		if(itemId.type != tItemId::ID_ITEM && itemId.type != tItemId::ID_OCCURRENCE)
+			ctx.assertIdType(itemId.type, tItemId::ID_ITEM);
 		sMessageEntryId eid(itemId.Id.data(), itemId.Id.size());
 		sFolderSpec parentFolder = ctx.resolveFolder(eid);
 		std::string dir = ctx.getDir(parentFolder);
@@ -1018,12 +1060,11 @@ void process(mGetItemRequest&& request, XMLElement* response, const EWSContext& 
 			throw EWSError::AccessDenied(E3139);
 		mGetItemResponseMessage& msg = data.ResponseMessages.emplace_back();
 		auto mid = eid.messageId();
-		if(itemId.Id.size() <= 70) // Normal message entry ids have length of 70, occurrences contain extra data
-			msg.Items.emplace_back(ctx.loadItem(dir, parentFolder.folderId, mid, shape));
-		else {
+		if(itemId.type == tItemId::ID_OCCURRENCE) {
 			sOccurrenceId oid(itemId.Id.data(), itemId.Id.size());
 			msg.Items.emplace_back(ctx.loadOccurrence(dir, parentFolder.folderId, mid, oid.basedate, shape));
-		}
+		} else
+			msg.Items.emplace_back(ctx.loadItem(dir, parentFolder.folderId, mid, shape));
 		msg.success();
 	} catch(const EWSError& err) {
 		data.ResponseMessages.emplace_back(err);
@@ -1115,6 +1156,7 @@ void process(mSendItemRequest&& request, XMLElement* response, const EWSContext&
 
 	data.Responses.reserve(request.ItemIds.size());
 	for(tItemId& itemId : request.ItemIds) try {
+		ctx.assertIdType(itemId.type, tItemId::ID_ITEM);
 		sMessageEntryId meid(itemId.Id.data(), itemId.Id.size());
 		sFolderSpec folder = ctx.resolveFolder(meid);
 		std::string dir = ctx.getDir(folder);
@@ -1162,7 +1204,7 @@ void process(mUpdateFolderRequest&& request, XMLElement* response, const EWSCont
 		sShape shape(change);
 		ctx.getNamedTags(dir, shape, true);
 		for(const auto& update : change.Updates) {
-			if(holds_alternative<tSetFolderField>(update))
+			if (std::holds_alternative<tSetFolderField>(update))
 				std::get<tSetFolderField>(update).put(shape);
 		}
 		TPROPVAL_ARRAY props = shape.write();
@@ -1246,6 +1288,7 @@ void process(mUpdateItemRequest&& request, XMLElement* response, const EWSContex
 	sShape idOnly;
 	idOnly.add(PR_ENTRYID, sShape::FL_FIELD).add(PR_CHANGE_KEY, sShape::FL_FIELD).add(PR_MESSAGE_CLASS);
 	for(const auto& change : request.ItemChanges) try {
+		ctx.assertIdType(change.ItemId.type, tFolderId::ID_ITEM);
 		sMessageEntryId mid(change.ItemId.Id.data(), change.ItemId.Id.size());
 		sFolderSpec parentFolder = ctx.resolveFolder(mid);
 		std::string dir = ctx.getDir(parentFolder);
@@ -1255,7 +1298,7 @@ void process(mUpdateItemRequest&& request, XMLElement* response, const EWSContex
 		sShape shape(change);
 		ctx.getNamedTags(dir, shape, true);
 		for(const auto& update : change.Updates) {
-			if(holds_alternative<tSetItemField>(update))
+			if (std::holds_alternative<tSetItemField>(update))
 				std::get<tSetItemField>(update).put(shape);
 		}
 		TPROPVAL_ARRAY props = shape.write();

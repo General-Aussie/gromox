@@ -150,12 +150,9 @@ unsigned int g_midb_schema_upgrades;
 unsigned int g_midb_cache_interval, g_midb_reload_interval;
 
 static constexpr auto DB_LOCK_TIMEOUT = std::chrono::seconds(60);
-static BOOL g_wal;
-static BOOL g_async;
 static size_t g_table_size;
 static std::atomic<unsigned int> g_sequence_id;
 static gromox::atomic_bool g_notify_stop; /* stop signal for scanning thread */
-static uint64_t g_mmap_size;
 static pthread_t g_scan_tid;
 static char g_org_name[256];
 static alloc_limiter<MJSON_MIME> g_alloc_mjson{"g_alloc_mjson.d"};
@@ -249,10 +246,9 @@ static uint64_t mail_engine_get_digest(sqlite3 *psqlite, const char *mid_string,
 		auto djson = json_to_str(digest);
 		snprintf(temp_path, 256, "%s/ext/%s",
 			common_util_get_maildir(), mid_string);
-		wrapfd fd = open(temp_path, O_CREAT|O_TRUNC|O_WRONLY, 0666);
+		wrapfd fd = open(temp_path, O_CREAT | O_TRUNC | O_WRONLY, FMODE_PRIVATE);
 		if (fd.get() >= 0) {
-			auto wr_ret = HXio_fullwrite(fd.get(), djson.c_str(), djson.size());
-			if (wr_ret < 0 || static_cast<size_t>(wr_ret) != djson.size() ||
+			if (HXio_fullwrite(fd.get(), djson.c_str(), djson.size()) < 0 ||
 			    fd.close_wr() != 0)
 				mlog(LV_ERR, "E-2082: write %s: %s", temp_path, strerror(errno));
 		} else {
@@ -941,9 +937,8 @@ static bool mail_engine_ct_match_mail(sqlite3 *psqlite, const char *charset,
 		b_result1 = b_result;
 		POP_MATCH(ptree, pnode, conjunction, b_result)
 		goto RECURSION_POINT;
-	} else {
-		return b_result;
 	}
+	return b_result;
 }
 /* end of recursion procedure */
 
@@ -1479,17 +1474,16 @@ static void mail_engine_insert_message(sqlite3_stmt *pstmt, uint32_t *puidnext,
 		         static_cast<long long>(time(nullptr)), ++g_sequence_id);
 		mid_string = mid_string1;
 		sprintf(temp_path, "%s/ext/%s", dir, mid_string1);
-		wrapfd fd = open(temp_path, O_CREAT|O_TRUNC|O_WRONLY, 0666);
+		wrapfd fd = open(temp_path, O_CREAT | O_TRUNC | O_WRONLY, FMODE_PRIVATE);
 		if (fd.get() < 0)
 			return;
-		auto wr_ret = HXio_fullwrite(fd.get(), djson.c_str(), djson.size());
-		if (wr_ret < 0 || static_cast<size_t>(wr_ret) != djson.size() ||
+		if (HXio_fullwrite(fd.get(), djson.c_str(), djson.size()) < 0 ||
 		    fd.close_wr() != 0) {
 			mlog(LV_ERR, "E-1134: write %s: %s", temp_path, strerror(errno));
 			return;
 		}
 		sprintf(temp_path1, "%s/eml/%s", dir, mid_string1);
-		fd = open(temp_path1, O_CREAT|O_TRUNC|O_WRONLY, 0666);
+		fd = open(temp_path1, O_CREAT | O_TRUNC | O_WRONLY, FMODE_PRIVATE);
 		if (fd.get() < 0)
 			return;
 		if (!imail.to_file(fd.get()))
@@ -1798,9 +1792,8 @@ static BOOL mail_engine_get_encoded_name(xstmt &pstmt,
 		auto length = name.size();
 		if (length >= 256)
 			return FALSE;
-		if (0 != offset) {
+		if (offset != 0)
 			temp_name[offset++] = '/';
-		}
 		if (offset + length >= 512)
 			return FALSE;
 		memcpy(&temp_name[offset], name.c_str(), length);
@@ -2109,7 +2102,6 @@ static IDB_REF mail_engine_get_idb(const char *path, bool force_resync = false)
 {
 	BOOL b_load;
 	char temp_path[256];
-	char sql_string[1024];
 	
 	b_load = FALSE;
 	std::unique_lock hhold(g_hash_lock);
@@ -2141,12 +2133,6 @@ static IDB_REF mail_engine_get_idb(const char *path, bool force_resync = false)
 			return {};
 		}
 		gx_sql_exec(pidb->psqlite, "PRAGMA foreign_keys=ON");
-		gx_sql_exec(pidb->psqlite, g_async ? "PRAGMA synchronous=ON" : "PRAGMA synchronous=OFF");
-		gx_sql_exec(pidb->psqlite, g_wal ? "PRAGMA journal_mode=WAL" : "PRAGMA journal_mode=DELETE");
-		if (0 != g_mmap_size) {
-			snprintf(sql_string, sizeof(sql_string), "PRAGMA mmap_size=%llu", LLU{g_mmap_size});
-			gx_sql_exec(pidb->psqlite, sql_string);
-		}
 		gx_sql_exec(pidb->psqlite, "DELETE FROM mapping");
 		/* Delete obsolete field (old midb versions cannot use the db then however) */
 		// gx_sql_exec(pidb->psqlite, "DELETE FROM configurations WHERE config_id=1");
@@ -2412,13 +2398,12 @@ static int mail_engine_minst(int argc, char **argv, int sockd) try
 	digest["file"] = "";
 	auto djson = json_to_str(digest);
 	sprintf(temp_path, "%s/ext/%s", argv[1], argv[3]);
-	wrapfd fd = open(temp_path, O_CREAT | O_TRUNC | O_WRONLY, 0666);
+	wrapfd fd = open(temp_path, O_CREAT | O_TRUNC | O_WRONLY, FMODE_PRIVATE);
 	if (fd.get() < 0) {
 		mlog(LV_ERR, "E-2073: Opening %s for writing failed: %s", temp_path, strerror(errno));
 		return MIDB_E_DISK_ERROR;
 	}
-	auto wr_ret = HXio_fullwrite(fd.get(), djson.data(), djson.size());
-	if (wr_ret < 0 || static_cast<size_t>(wr_ret) != djson.size() ||
+	if (HXio_fullwrite(fd.get(), djson.data(), djson.size()) < 0 ||
 	    fd.close_wr() != 0)
 		mlog(LV_ERR, "E-2085: write %s: %s", temp_path, strerror(errno));
 	auto pidb = mail_engine_get_idb(argv[1]);
@@ -3467,7 +3452,7 @@ static int mail_engine_pdtlu(int argc, char **argv, int sockd) try
 		Json::Value digest;
 		if (mail_engine_get_digest(pidb->psqlite, dt.first.c_str(),
 		    digest) == 0)
-			return MIDB_E_DIGEST;
+			digest = Json::objectValue;
 		auto djson = json_to_str(digest);
 		djson.insert(0, temp_buff);
 		djson.append("\r\n");
@@ -4435,15 +4420,11 @@ static void mail_engine_notification_proc(const char *dir,
 }
 
 void mail_engine_init(const char *default_charset, const char *org_name,
-    size_t table_size, BOOL b_async, BOOL b_wal,
-    uint64_t mmap_size)
+    size_t table_size)
 {
 	g_sequence_id = 0;
 	gx_strlcpy(g_default_charset, default_charset, std::size(g_default_charset));
 	gx_strlcpy(g_org_name, org_name, std::size(g_org_name));
-	g_async = b_async;
-	g_wal = b_wal;
-	g_mmap_size = mmap_size;
 	g_table_size = table_size;
 }
 

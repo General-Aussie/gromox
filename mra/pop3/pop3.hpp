@@ -67,12 +67,6 @@ struct pop3_context final : public schedule_context {
 };
 using POP3_CONTEXT = pop3_context;
 
-extern void listener_init(const char *addr, uint16_t port, uint16_t port_ssl);
-extern int listener_run();
-extern int listener_trigger_accept();
-extern void listener_stop_accept();
-extern void listener_stop();
-
 extern int pop3_cmd_handler_capa(const char *cmd_line, int line_length, POP3_CONTEXT *);
 extern int pop3_cmd_handler_stls(const char *cmd_line, int line_length, POP3_CONTEXT *);
 extern int pop3_cmd_handler_user(const char *cmd_line, int line_length, POP3_CONTEXT *);
@@ -103,8 +97,6 @@ extern int resource_run();
 extern void resource_stop();
 extern const char *resource_get_pop3_code(unsigned int code_type, unsigned int n, size_t *len);
 
-extern int system_services_run();
-extern void system_services_stop();
 extern void xrpc_build_env();
 extern void xrpc_free_env();
 

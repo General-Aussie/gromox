@@ -8,19 +8,26 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <pthread.h>
 #include <string>
+#include <typeinfo>
 #include <unistd.h>
 #include <utility>
 #include <vector>
 #include <libHX/misc.h>
 #include <libHX/option.h>
+#include <libHX/socket.h>
 #include <libHX/string.h>
+#include <netinet/in.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <gromox/atomic.hpp>
+#include <gromox/authmgr.hpp>
 #include <gromox/bounce_gen.hpp>
 #include <gromox/config_file.hpp>
+#include <gromox/defs.h>
 #include <gromox/exmdb_client.hpp>
 #include <gromox/exmdb_rpc.hpp>
 #include <gromox/fileio.h>
@@ -36,7 +43,6 @@
 #include "bounce_producer.hpp"
 #include "common_util.h"
 #include "exmdb_client.h"
-#include "listener.hpp"
 #include "object_tree.h"
 #include "rpc_parser.hpp"
 #include "system_services.hpp"
@@ -44,11 +50,43 @@
 
 using namespace gromox;
 
-gromox::atomic_bool g_notify_stop;
+decltype(system_services_auth_login) system_services_auth_login;
+decltype(system_services_auth_login_token) system_services_auth_login_token;
+#define E(s) decltype(system_services_ ## s) system_services_ ## s;
+E(check_same_org)
+E(get_domain_groups)
+E(get_domain_ids)
+E(get_domain_info)
+E(get_domain_users)
+E(get_group_users)
+E(get_homedir)
+E(get_id_from_username)
+E(get_maildir)
+E(get_mlist_ids)
+E(get_mlist_memb)
+E(get_org_domains)
+E(get_timezone)
+E(get_user_displayname)
+E(get_user_ids)
+E(get_user_lang)
+E(get_user_privilege_bits)
+E(get_username_from_id)
+E(setpasswd)
+E(set_timezone)
+E(set_user_lang)
+E(scndstore_hints)
+E(meta)
+#undef E
+int (*system_services_add_timer)(const char *, int);
+
+gromox::atomic_bool g_main_notify_stop;
 std::shared_ptr<CONFIG_FILE> g_config_file;
 static char *opt_config_file;
 static unsigned int opt_show_version;
 static gromox::atomic_bool g_hup_signalled;
+static gromox::atomic_bool g_listener_notify_stop;
+static int g_listen_sockd;
+static pthread_t g_listener_id;
 
 static constexpr struct HXoption g_options_table[] = {
 	{nullptr, 'c', HXTYPE_STRING, &opt_config_file, nullptr, nullptr, 0, "Config file to read", "FILE"},
@@ -103,7 +141,7 @@ static constexpr cfg_directive zcore_cfg_defaults[] = {
 
 static void term_handler(int signo)
 {
-	g_notify_stop = true;
+	g_main_notify_stop = true;
 }
 
 static bool zcore_reload_config(std::shared_ptr<CONFIG_FILE> gxcfg,
@@ -130,6 +168,136 @@ static bool zcore_reload_config(std::shared_ptr<CONFIG_FILE> gxcfg,
 	g_oxcical_allday_ymd = pconfig->get_ll("oxcical_allday_ymd");
 	zcore_max_obh_per_session = pconfig->get_ll("zcore_max_obh_per_session");
 	return true;
+}
+
+static int system_services_run()
+{
+#define E(f, s) do { \
+	(f) = reinterpret_cast<decltype(f)>(service_query((s), "system", typeid(*(f)))); \
+	if ((f) == nullptr) { \
+		mlog(LV_ERR, "system_services: failed to get the \"%s\" service", (s)); \
+		return -1; \
+	} \
+} while (false)
+
+	E(system_services_get_user_lang, "get_user_lang");
+	E(system_services_set_user_lang, "set_user_lang");
+	E(system_services_get_maildir, "get_maildir");
+	E(system_services_get_homedir, "get_homedir");
+	E(system_services_get_timezone, "get_timezone");
+	E(system_services_set_timezone, "set_timezone");
+	E(system_services_get_username_from_id, "get_username_from_id");
+	E(system_services_get_id_from_username, "get_id_from_username");
+	E(system_services_get_domain_ids, "get_domain_ids");
+	E(system_services_get_user_ids, "get_user_ids");
+	E(system_services_auth_login, "auth_login_gen");
+	E(system_services_auth_login_token, "auth_login_token");
+	E(system_services_get_user_displayname, "get_user_displayname");
+	E(system_services_get_org_domains, "get_org_domains");
+	E(system_services_get_domain_info, "get_domain_info");
+	E(system_services_get_domain_groups, "get_domain_groups");
+	E(system_services_get_group_users, "get_group_users");
+	E(system_services_get_domain_users, "get_domain_users");
+	E(system_services_get_mlist_ids, "get_mlist_ids");
+	E(system_services_get_mlist_memb, "get_mlist_memb");
+	E(system_services_check_same_org, "check_same_org");
+	E(system_services_setpasswd, "set_password");
+	E(system_services_get_user_privilege_bits, "get_user_privilege_bits");
+	E(system_services_add_timer, "add_timer");
+	E(system_services_scndstore_hints, "scndstore_hints");
+	return 0;
+#undef E
+}
+
+static void system_services_stop()
+{
+#define E(b) service_release(b, "system")
+	E("get_user_lang");
+	E("set_user_lang");
+	E("get_maildir");
+	E("get_homedir");
+	E("get_timezone");
+	E("set_timezone");
+	E("get_username_from_id");
+	E("get_id_from_username");
+	E("get_domain_ids");
+	E("get_user_ids");
+	E("auth_login_gen");	
+	E("auth_login_token");
+	E("get_user_displayname");
+	E("get_org_domains");
+	E("get_domain_info");
+	E("get_domain_groups");
+	E("get_group_users");
+	E("get_domain_users");
+	E("get_mlist_ids");
+	E("get_mlist_memb");
+	E("check_same_org");
+	E("set_password");
+	E("get_user_privilege_bits");
+	E("add_timer");
+	E("scndstore_hints");
+#undef E
+}
+
+static void *zcls_thrwork(void *param)
+{
+	struct sockaddr_storage unix_addr;
+
+	while (!g_listener_notify_stop) {
+		socklen_t len = sizeof(unix_addr);
+		memset(&unix_addr, 0, sizeof(unix_addr));
+		int clifd = accept(g_listen_sockd, reinterpret_cast<struct sockaddr *>(&unix_addr), &len);
+		if (clifd == -1)
+			continue;
+		if (!rpc_parser_activate_connection(clifd))
+			close(clifd);
+	}
+	return nullptr;
+}
+
+static void listener_init()
+{
+	g_listen_sockd = -1;
+	g_listener_notify_stop = true;
+}
+
+static int listener_run(const char *sockpath)
+{
+	g_listen_sockd = HX_local_listen(sockpath);
+	if (g_listen_sockd < 0) {
+		mlog(LV_ERR, "listen %s: %s", sockpath, strerror(-g_listen_sockd));
+		return -1;
+	}
+	gx_reexec_record(g_listen_sockd);
+	if (chmod(sockpath, FMODE_PUBLIC) < 0) {
+		close(g_listen_sockd);
+		mlog(LV_ERR, "listener: failed to change the access mode of %s", sockpath);
+		return -3;
+	}
+	g_listener_notify_stop = false;
+	auto ret = pthread_create4(&g_listener_id, nullptr, zcls_thrwork, nullptr);
+	if (ret != 0) {
+		close(g_listen_sockd);
+		mlog(LV_ERR, "listener: failed to create accept thread: %s", strerror(ret));
+		return -5;
+	}
+	pthread_setname_np(g_listener_id, "accept");
+	return 0;
+}
+
+static void listener_stop()
+{
+	g_listener_notify_stop = true;
+	if (g_listen_sockd >= 0)
+		shutdown(g_listen_sockd, SHUT_RDWR);
+	if (!pthread_equal(g_listener_id, {})) {
+		pthread_kill(g_listener_id, SIGALRM);
+		pthread_join(g_listener_id, nullptr);
+	}
+	if (g_listen_sockd >= 0)
+		close(g_listen_sockd);
+	g_listen_sockd = -1;
 }
 
 int main(int argc, const char **argv) try
@@ -293,7 +461,7 @@ int main(int argc, const char **argv) try
 	sigaction(SIGINT, &sact, nullptr);
 	sigaction(SIGTERM, &sact, nullptr);
 	mlog(LV_NOTICE, "system: zcore is now running");
-	while (!g_notify_stop) {
+	while (!g_main_notify_stop) {
 		sleep(1);
 		if (g_hup_signalled.exchange(false)) {
 			zcore_reload_config(nullptr, nullptr);

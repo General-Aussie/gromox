@@ -61,19 +61,6 @@ struct DIR_NODE {
 	alloc_limiter<DIR_NODE> *ppool;
 };
 
-struct dir_tree {
-	dir_tree(alloc_limiter<DIR_NODE> *);
-	~dir_tree();
-	void load_from_memfile(const std::vector<std::string> &);
-	DIR_NODE *match(const char *path);
-	static DIR_NODE *get_child(DIR_NODE *);
-
-	SIMPLE_TREE tree{};
-	alloc_limiter<DIR_NODE> *ppool = nullptr;
-};
-using DIR_TREE = dir_tree;
-using DIR_TREE_ENUM = void (*)(DIR_NODE *, void*);
-
 struct imap_context;
 struct content_array final : public XARRAY {
 	using XARRAY::XARRAY;
@@ -184,11 +171,6 @@ extern int imap_cmd_parser_uid_copy(int argc, char **argv, IMAP_CONTEXT *);
 extern int imap_cmd_parser_uid_expunge(int argc, char **argv, IMAP_CONTEXT *);
 extern int imap_cmd_parser_dval(int argc, char **argv, IMAP_CONTEXT *, unsigned int res);
 
-extern void listener_init(const char *addr, uint16_t port, uint16_t port_ssl);
-extern int listener_run();
-extern int listener_trigger_accept();
-extern void listener_stop_accept();
-extern void listener_stop();
 extern char *capability_list(char *, size_t, IMAP_CONTEXT *);
 
 extern int resource_run();
@@ -198,8 +180,6 @@ extern const char *resource_get_default_charset(const char *lang);
 extern const char *resource_get_error_string(unsigned int);
 extern void imap_parser_event_expunge(const char *user, const char *folder, unsigned int uid);
 
-extern int system_services_run();
-extern void system_services_stop();
 extern void imrpc_build_env();
 extern void imrpc_free_env();
 

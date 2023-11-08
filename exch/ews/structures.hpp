@@ -267,9 +267,9 @@ using sItemChangeDescription = std::variant<tAppendToItemField, tSetItemField, t
  */
 struct sMailboxInfo
 {
-	GUID mailboxGuid; ///< PR_STORE_RECORD_KEY store property
-	uint32_t accountId; ///< MySQL account ID
-	bool isPublic; ///< Whether it is a public (domain) store
+	GUID mailboxGuid{}; ///< PR_STORE_RECORD_KEY store property
+	uint32_t accountId = 0; ///< MySQL account ID
+	bool isPublic = false; ///< Whether it is a public (domain) store
 };
 
 using sNamedPropertyMap = std::unordered_map<uint32_t, PROPERTY_NAME>;
@@ -467,12 +467,22 @@ struct tAttachment : public NS_EWS_Types
  */
 struct tBaseItemId
 {
-	sBase64Binary Id; //Attribute
+	enum IdType : uint8_t {
+		ID_UNKNOWN, ///< Unspecified
+		ID_GENERIC, ///< Non-entry id, but uses the same tag layout
+		ID_FOLDER, ///< 46 byte folder entry id
+		ID_ITEM, ///< 70 byte message entry id
+		ID_ATTACHMENT, ///< 70 byte message entry id + 4 byte attachment index
+		ID_OCCURRENCE, ///< 70 byte message entry id + 4 byte occurrence day
+	};
+
+	mutable sBase64Binary Id; //Attribute
 	std::optional<sBase64Binary> ChangeKey; //Attribute
+	IdType type = ID_UNKNOWN;
 
 	tBaseItemId() = default;
 	tBaseItemId(const tinyxml2::XMLElement*);
-	tBaseItemId(const sBase64Binary&, const std::optional<sBase64Binary>& = std::nullopt);
+	tBaseItemId(const sBase64Binary&, IdType=ID_UNKNOWN);
 
 	void serialize(tinyxml2::XMLElement*) const;
 };
@@ -975,7 +985,7 @@ struct tAppendToItemField : public tChangeDescription
  */
 struct tConflictResults
 {
-	int Count;
+	int Count = 0;
 
 	void serialize(tinyxml2::XMLElement*) const;
 };
@@ -2786,6 +2796,35 @@ struct mGetUserAvailabilityResponse
 
 	std::optional<std::vector<mFreeBusyResponse>> FreeBusyResponseArray;
 	//<xs:element minOccurs="0" maxOccurs="1" name="SuggestionsResponse" type="m:SuggestionsResponseType" />
+};
+
+/**
+ * Messages.xsd:4116
+ */
+struct mGetUserPhotoRequest
+{
+	explicit mGetUserPhotoRequest(const tinyxml2::XMLElement*);
+
+	std::string Email;
+	// We currently have no means of resizing/converting photos, so we'll ignore the request data
+	//<xs:element name="SizeRequested" type="t:UserPhotoSizeType" minOccurs="1" maxOccurs="1" />
+	//<xs:element name="TypeRequested" type="t:UserPhotoTypeType" minOccurs="0" maxOccurs="1" />
+};
+
+/**
+ * Messages.xsd:4131
+ *
+ * Does not utilize ResponseMessages array indirection,
+ * instead contains response data directly.
+ */
+struct mGetUserPhotoResponse : public mResponseMessageType
+{
+	using mResponseMessageType::mResponseMessageType;
+
+	bool HasChanged = true; // There is currently no mechanism to determine this, so always return true.
+	sBase64Binary PictureData;
+
+	void serialize(tinyxml2::XMLElement*) const;
 };
 
 /**

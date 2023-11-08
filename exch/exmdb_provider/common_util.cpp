@@ -390,7 +390,7 @@ BOOL common_util_allocate_eid_from_folder(sqlite3 *psqlite,
 	return TRUE;
 }
 
-BOOL common_util_allocate_cn(sqlite3 *psqlite, uint64_t *pcn)
+ec_error_t cu_allocate_cn(sqlite3 *psqlite, uint64_t *pcn)
 {
 	char sql_string[128];
 	
@@ -399,7 +399,7 @@ BOOL common_util_allocate_cn(sqlite3 *psqlite, uint64_t *pcn)
 				CONFIG_ID_LAST_CHANGE_NUMBER);
 	auto pstmt = gx_sql_prep(psqlite, sql_string);
 	if (pstmt == nullptr)
-		return FALSE;
+		return ecJetError;
 	uint64_t last_cn = pstmt.step() == SQLITE_ROW ?
 	                   sqlite3_column_int64(pstmt, 0) : 0;
 	pstmt.finalize();
@@ -409,12 +409,12 @@ BOOL common_util_allocate_cn(sqlite3 *psqlite, uint64_t *pcn)
 				CONFIG_ID_LAST_CHANGE_NUMBER);
 	pstmt = gx_sql_prep(psqlite, sql_string);
 	if (pstmt == nullptr)
-		return FALSE;
+		return ecJetError;
 	sqlite3_bind_int64(pstmt, 1, last_cn);
 	if (pstmt.step() != SQLITE_DONE)
-		return FALSE;
+		return ecJetError;
 	*pcn = last_cn;
-	return TRUE;
+	return ecSuccess;
 }
 
 BOOL common_util_allocate_folder_art(sqlite3 *psqlite, uint32_t *part)
@@ -2799,9 +2799,11 @@ static errno_t cu_cid_writeout(const char *maildir, std::string_view data,
 	path = maildir + "/cid/"s + hval.str();
 	cid  = hval.str();
 	std::unique_ptr<char[], stdlib_delete> extradir(HX_dirname(path.c_str()));
-	if (extradir == nullptr)
+	if (extradir == nullptr) {
+		mlog(LV_ERR, "E-5318: ENOMEM");
 		return ENOMEM;
-	auto ret = HX_mkdir(extradir.get(), S_IRUGO | S_IWUGO | S_IXUGO);
+	}
+	auto ret = HX_mkdir(extradir.get(), FMODE_PRIVATE | S_IXUSR | S_IXGRP);
 	if (ret < 0) {
 		mlog(LV_ERR, "E-2388: mkdir %s: %s", extradir.get(), strerror(-ret));
 		return -ret;
@@ -2828,8 +2830,10 @@ static errno_t cu_cid_writeout(const char *maildir, std::string_view data,
 	 * still be a block where it is comparatively high.
 	 */
 	auto err = gx_compress_tofd(data, tmf, g_cid_compression);
-	if (err != 0)
+	if (err != 0) {
+		mlog(LV_ERR, "E-5319: zstd routines have failed for object %s", path.c_str());
 		return err;
+	}
 	/*
 	 * If another thread created a writeout in the meantime, we will now
 	 * overwrite it. Since the contents are the same, that has no ill
@@ -2839,7 +2843,11 @@ static errno_t cu_cid_writeout(const char *maildir, std::string_view data,
 	 * It is not too terrible, considering this can only happen for newly
 	 * instantiated @paths.
 	 */
-	return tmf.link_to(path.c_str());
+	err = tmf.link_to(path.c_str());
+	if (err != 0)
+		mlog(LV_ERR, "E-5320: link %s -> %s: %s", tmf.m_path.c_str(),
+			path.c_str(), strerror(err));
+	return err;
 } catch (const std::bad_alloc &) {
 	mlog(LV_ERR, "E-2305: ENOMEM");
 	return ENOMEM;
@@ -4541,7 +4549,7 @@ static BOOL common_util_copy_message_internal(sqlite3 *psqlite,
 	} else if (!common_util_allocate_eid(psqlite, pdst_mid)) {
 		return FALSE;
 	}
-	if (!common_util_allocate_cn(psqlite, &change_num))
+	if (cu_allocate_cn(psqlite, &change_num) != ecSuccess)
 		return FALSE;
 	if (pchange_num != nullptr)
 		*pchange_num = change_num;
@@ -4575,12 +4583,16 @@ static BOOL common_util_copy_message_internal(sqlite3 *psqlite,
 			         exmdb_server::get_dir(), mid_string);
 			snprintf(tmp_path1, std::size(tmp_path1), "%s/eml/%s",
 			         exmdb_server::get_dir(), mid_string1);
-			link(tmp_path1, tmp_path);
+			if (link(tmp_path1, tmp_path) < 0)
+				mlog(LV_ERR, "E-5310: link %s -> %s: %s",
+					tmp_path1, tmp_path, strerror(errno));
 			snprintf(tmp_path, std::size(tmp_path), "%s/ext/%s",
 			         exmdb_server::get_dir(), mid_string);
 			snprintf(tmp_path1, std::size(tmp_path1), "%s/ext/%s",
 			         exmdb_server::get_dir(), mid_string1);
-			link(tmp_path1, tmp_path);
+			if (link(tmp_path1, tmp_path) < 0)
+				mlog(LV_ERR, "E-5311: link %s -> %s: %s",
+					tmp_path1, tmp_path, strerror(errno));
 		}
 	}
 	if (pmessage_size != nullptr)
@@ -4731,7 +4743,7 @@ BOOL common_util_copy_message(sqlite3 *psqlite, int account_id,
 		exmdb_server::is_private() ?
 			rop_util_make_user_guid(account_id) :
 			rop_util_make_domain_guid(account_id),
-		change_num});
+		rop_util_make_eid_ex(1, change_num)});
 	if (propval_buff[0].pvalue == nullptr)
 		return FALSE;
 	propval_buff[1].proptag = PR_PREDECESSOR_CHANGE_LIST;

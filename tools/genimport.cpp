@@ -223,12 +223,10 @@ void gi_folder_map_write(const gi_folder_map_t &map)
 		    ep.p_str(tgt.create_name.c_str()) != EXT_ERR_SUCCESS)
 			throw YError("PG-1103");
 	uint64_t xsize = cpu_to_le64(ep.m_offset);
-	auto ret = HXio_fullwrite(STDOUT_FILENO, &xsize, sizeof(xsize));
-	if (ret < 0)
-		throw YError("PG-1104: %s", strerror(-ret));
-	ret = HXio_fullwrite(STDOUT_FILENO, ep.m_vdata, ep.m_offset);
-	if (ret < 0)
-		throw YError("PG-1106: %s", strerror(-ret));
+	if (HXio_fullwrite(STDOUT_FILENO, &xsize, sizeof(xsize)) < 0)
+		throw YError("PG-1104: %s", strerror(errno));
+	if (HXio_fullwrite(STDOUT_FILENO, ep.m_vdata, ep.m_offset) < 0)
+		throw YError("PG-1106: %s", strerror(errno));
 }
 
 void gi_name_map_read(const void *buf, size_t bufsize, gi_name_map &map)
@@ -266,12 +264,10 @@ void gi_name_map_write(const gi_name_map &map)
 		    ep.p_propname(static_cast<PROPERTY_NAME>(xn)) != EXT_ERR_SUCCESS)
 			throw YError("PG-1111");
 	uint64_t xsize = cpu_to_le64(ep.m_offset);
-	auto ret = HXio_fullwrite(STDOUT_FILENO, &xsize, sizeof(xsize));
-	if (ret < 0)
-		throw YError("PG-1112: %s", strerror(-ret));
-	ret = HXio_fullwrite(STDOUT_FILENO, ep.m_vdata, ep.m_offset);
-	if (ret < 0)
-		throw YError("PG-1114: %s", strerror(-ret));
+	if (HXio_fullwrite(STDOUT_FILENO, &xsize, sizeof(xsize)) < 0)
+		throw YError("PG-1112: %s", strerror(errno));
+	if (HXio_fullwrite(STDOUT_FILENO, ep.m_vdata, ep.m_offset) < 0)
+		throw YError("PG-1114: %s", strerror(errno));
 }
 
 uint16_t gi_resolve_namedprop(const PROPERTY_XNAME &xpn_req)
@@ -289,7 +285,7 @@ uint16_t gi_resolve_namedprop(const PROPERTY_XNAME &xpn_req)
 	return pid_rsp.ppropid[0];
 }
 
-int exm_set_change_keys(TPROPVAL_ARRAY *props, uint64_t change_num)
+int exm_set_change_keys(TPROPVAL_ARRAY *props, eid_t change_num)
 {
 	/* Set the change key and initial PCL for the object */
 	XID zxid{g_public_folder ? rop_util_make_domain_guid(g_user_id) :
@@ -417,6 +413,9 @@ int exm_deliver_msg(const char *target, MESSAGE_CONTENT *ct, unsigned int mode)
 		return EXIT_FAILURE;
 	case deliver_message_result::mailbox_full_bymsg:
 		fprintf(stderr, "Message rejected - mailbox has reached maximum message count (cf. exmdb_provider.cfg:max_store_message_count)");
+		return EXIT_FAILURE;
+	case deliver_message_result::partial_completion:
+		fprintf(stderr, "Partial completion - The server could not save all of the message (wrong permissions/disk full/...)\n");
 		return EXIT_FAILURE;
 	}
 	if (!(mode & DELIVERY_TWOSTEP))

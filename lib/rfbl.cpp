@@ -798,7 +798,8 @@ errno_t gx_reexec(const char *const *argv) try
 {
 	auto s = getenv("GX_REEXEC_DONE");
 	if (s != nullptr || argv == nullptr) {
-		chdir("/");
+		if (chdir("/") < 0)
+			mlog(LV_ERR, "E-5312: chdir /: %s", strerror(errno));
 		unsetenv("GX_REEXEC_DONE");
 		unsetenv("HX_LISTEN_TOP_FD");
 		unsetenv("LISTEN_FDS");
@@ -863,10 +864,24 @@ errno_t switch_user_exec(const CONFIG_FILE &cf, const char **argv)
 	if (user == nullptr)
 		user = RUNNING_IDENTITY;
 	switch (HXproc_switch_user(user, nullptr)) {
-	case HXPROC_SU_NOOP:
-		return gx_reexec(nullptr);
-	case HXPROC_SU_SUCCESS:
-		return gx_reexec(argv);
+	case HXPROC_SU_NOOP: {
+		auto ret = gx_reexec(nullptr);
+		if (ret != 0)
+			return ret;
+		auto m = umask(07777);
+		m = (m & ~0070) | ((m & 0700) >> 3); /* copy user bits to group bits */
+		umask(m);
+		return 0;
+	}
+	case HXPROC_SU_SUCCESS: {
+		auto ret = gx_reexec(argv);
+		if (ret != 0)
+			return ret;
+		auto m = umask(07777);
+		m = (m & ~0070) | ((m & 0700) >> 3);
+		umask(m);
+		return 0;
+	}
 	case HXPROC_USER_NOT_FOUND:
 		mlog(LV_ERR, "No such user \"%s\": %s", user, strerror(errno));
 		break;
@@ -1017,7 +1032,7 @@ int iconv_validate()
 
 bool get_digest(const Json::Value &jval, const char *key, char *out, size_t outmax) try
 {
-	if (!jval.isMember(key))
+	if (jval.type() != Json::ValueType::objectValue || !jval.isMember(key))
 		return false;
 	auto &memb = jval[key];
 	if (memb.isString())
@@ -1397,8 +1412,7 @@ errno_t gx_compress_tofd(std::string_view inbuf, int fd, uint8_t complvl)
 		auto zr = ZSTD_compressStream2(strm, &outds, &inds, ZSTD_e_continue);
 		if (ZSTD_isError(zr))
 			return EIO;
-		auto r2 = HXio_fullwrite(fd, outds.dst, outds.pos);
-		if (r2 < 0 || static_cast<size_t>(r2) != outds.pos)
+		if (HXio_fullwrite(fd, outds.dst, outds.pos) < 0)
 			return EIO;
 	}
 	while (true) {
@@ -1406,8 +1420,7 @@ errno_t gx_compress_tofd(std::string_view inbuf, int fd, uint8_t complvl)
 		auto zr = ZSTD_compressStream2(strm, &outds, &inds, ZSTD_e_end);
 		if (ZSTD_isError(zr))
 			return EIO;
-		auto r2 = HXio_fullwrite(fd, outds.dst, outds.pos);
-		if (r2 < 0 || static_cast<size_t>(r2) != outds.pos)
+		if (HXio_fullwrite(fd, outds.dst, outds.pos) < 0)
 			return EIO;
 		if (zr == 0)
 			break;
@@ -1415,9 +1428,10 @@ errno_t gx_compress_tofd(std::string_view inbuf, int fd, uint8_t complvl)
 	return 0;
 }
 
-errno_t gx_compress_tofile(std::string_view inbuf, const char *outfile, uint8_t complvl)
+errno_t gx_compress_tofile(std::string_view inbuf, const char *outfile,
+    uint8_t complvl, unsigned int mode)
 {
-	wrapfd fd(open(outfile, O_WRONLY | O_TRUNC | O_CREAT, 0666));
+	wrapfd fd = open(outfile, O_WRONLY | O_TRUNC | O_CREAT, mode);
 	auto ret = gx_compress_tofd(inbuf, fd.get(), complvl);
 	if (ret != 0)
 		return ret;
