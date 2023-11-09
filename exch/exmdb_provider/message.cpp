@@ -4010,7 +4010,7 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
     return ecSuccess;
 }
 
-BOOL exmdb_server::message_meeting_reply(const char *frm, const MESSAGE_CONTENT *pmsgctnt, ec_error_t *pb_result)
+BOOL exmdb_server::message_meeting_reply(const char *dir, const char *frm, const MESSAGE_CONTENT *pmsgctnt, ec_error_t *pb_result)
 {
 	char tmp_buff[256*1024];
 	/* Buffers above may be referenced by pmsgctnt (cu_set_propvals) */	

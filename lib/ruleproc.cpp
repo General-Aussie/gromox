@@ -1072,7 +1072,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					auto frm = par.ev_from;
 					ec_error_t e_result = ecRpcFailed;
 					ec_error_t pb_result = ecRpcFailed;
-					if(!exmdb_client::message_meeting_reply(frm, par.ctnt, &pb_result)){
+					if(!exmdb_client::message_meeting_reply(dir, frm, par.ctnt, &pb_result)){
 						mlog(LV_DEBUG, "ruleproc: send_message failed");
 						return ecRpcFailed;
 					} else if (pb_result != ecSuccess) {
