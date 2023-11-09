@@ -1070,7 +1070,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					mlog(LV_ERR, "PREC: about to write out  %s", dir);
 					
 					/* Writeout */
-					auto frm = par.ev_from;
+					// auto frm = par.ev_from;
 					ec_error_t e_result = ecRpcFailed;
 					// ec_error_t pb_result = ecRpcFailed;
 					// if(!exmdb_client::message_meeting_reply(dir, frm, dst_mid, dst.get(), &pb_result)){
