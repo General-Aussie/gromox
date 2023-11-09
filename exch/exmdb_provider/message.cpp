@@ -4030,7 +4030,6 @@ BOOL exmdb_server::message_meeting_reply(const char *dir, const char *frm, uint6
 	if (pstmt == nullptr)
 		return FALSE;
 	if (pstmt.step() != SQLITE_ROW) {
-		*ppbrief = NULL;
 		return TRUE;
 	}
 	// pstmt.finalize();
