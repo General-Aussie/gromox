@@ -1080,10 +1080,11 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					// 	mlog(LV_DEBUG, "ruleproc: cannot send message: %s\n", mapi_strerror(e_result));
 					// 	return ecRpcFailed;
 					// }
-					auto mnt_time = rop_util_current_nttime();
-					if (dst->proplist.set(PR_MESSAGE_DELIVERY_TIME, &mnt_time) != 0)
-						/* ignore */;
-					dst->proplist.erase(PidTagChangeNumber);
+					// auto mnt_time = rop_util_current_nttime();
+					// if (dst->proplist.set(PR_MESSAGE_DELIVERY_TIME, &mnt_time) != 0)
+					// 	/* ignore */;
+					// dst->proplist.erase(PidTagChangeNumber);
+					mlog(LV_DEBUG, "ruleproc: about to send_message");
 					uint64_t folder_id, message_id = 0;
 					uint32_t r32 = 0;
 					unsigned int flags = DELIVERY_DO_RULES | DELIVERY_DO_NOTIF;
