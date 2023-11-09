@@ -924,7 +924,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 
 					uint64_t dst_mid = 0, dst_cn = 0;
 					/* Prepare write */
-					message_content_ptr dst(par.ctnt->dup());
+					const message_content_ptr dst(par.ctnt->dup());
 					if (dst == nullptr)
 						return ecMAPIOOM;
 					auto err = rx_npid_replace(par, *dst, dir);
@@ -1023,7 +1023,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						dst->proplist.set(PR_REPLY_REQUESTED, &tmp_byte) != 0)
 						return ecError;
 					
-					
+
 					subjectprefix = "Accepted";
 					if (dst->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 						return ecError;
