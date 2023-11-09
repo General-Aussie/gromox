@@ -4017,9 +4017,9 @@ BOOL exmdb_server::message_meeting_reply(const char *dir, const char *frm, const
 	*pb_result = ecSuccess;
 	mlog(LV_ERR, "W-PREC: pb_result set to true");
 
-	auto flag = pmsgctnt->proplist.get<const uint8_t>(PR_ASSOCIATED);
-	if (flag == nullptr || *flag == 0)
-		return TRUE;
+	// auto flag = pmsgctnt->proplist.get<const uint8_t>(PR_ASSOCIATED);
+	// if (flag == nullptr || *flag == 0)
+	// 	return TRUE;
 	
 	MAIL imail;
 	mlog(LV_ERR, "W-PREC: setting mail");
