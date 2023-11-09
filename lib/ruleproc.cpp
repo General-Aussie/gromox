@@ -1084,24 +1084,24 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					// if (dst->proplist.set(PR_MESSAGE_DELIVERY_TIME, &mnt_time) != 0)
 					// 	/* ignore */;
 					// dst->proplist.erase(PidTagChangeNumber);
-					mlog(LV_DEBUG, "ruleproc: about to send_message");
+					mlog(LV_ERR, "ruleproc: about to send_message");
 					uint64_t folder_id, message_id = 0;
 					uint32_t r32 = 0;
 					unsigned int flags = DELIVERY_DO_RULES | DELIVERY_DO_NOTIF;
 					if(!exmdb_client::deliver_message(dir, par.ev_to, par.ev_from, CP_ACP, flags, dst.get(), nullptr, &folder_id, &message_id, &r32)){
-						mlog(LV_DEBUG, "ruleproc: send_message failed");
+						mlog(LV_ERR, "ruleproc: send_message failed");
 						return ecRpcFailed;
 					}
 					auto dm_status = static_cast<deliver_message_result>(r32);
 					if (dm_status == deliver_message_result::result_ok) {
-						mlog(LV_DEBUG, "ruleproc: delivery message result is ok");
+						mlog(LV_ERR, "ruleproc: delivery message result is ok");
 					}
 					if (!exmdb_client::write_message(dir, use_name, CP_UTF8,
 						par.cur.fid, dst.get(), &e_result)) {
-						mlog(LV_DEBUG, "ruleproc: write_message failed");
+						mlog(LV_ERR, "ruleproc: write_message failed");
 						return ecRpcFailed;
 					} else if (e_result != ecSuccess) {
-						mlog(LV_DEBUG, "ruleproc: write_message: %s\n", mapi_strerror(e_result));
+						mlog(LV_ERR, "ruleproc: write_message: %s\n", mapi_strerror(e_result));
 						return ecRpcFailed;
 					}
 					mlog(LV_ERR, "PREC: done writing out  %s", dir);
