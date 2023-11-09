@@ -1031,7 +1031,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (dst->proplist.set(PR_MESSAGE_CLASS, "IPM.Schedule.Meeting.Resp.Pos") != 0)
 						return ecError;
 					// mlog(LV_ERR, "PREC: concatenatedvale: %s", concatenatedValue);
-					if (dst->proplist.set(PR_SUBJECT_PREFIX, subjectprefix) != 0)
+					if (dst->proplist.set(PR_SUBJECT_PREFIX, &subjectprefix) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 2 %s", dir);
 					if (dst->proplist.set(PR_BODY, par.ctnt->proplist.get<char>(PR_BODY)) != 0)
