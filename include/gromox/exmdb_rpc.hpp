@@ -862,8 +862,8 @@ struct exreq_appt_meetreq_overlap : public exreq {
 };
 
 struct exreq_message_meeting_reply : public exreq {
-	MESSAGE_CONTENT *pmsgctnt;
 	char *frm;
+	MESSAGE_CONTENT *pmsgctnt;
 };
 
 struct exreq_recalc_store_size : public exreq {

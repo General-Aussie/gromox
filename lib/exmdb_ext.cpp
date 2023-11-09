@@ -2258,6 +2258,21 @@ static pack_result exmdb_push(EXT_PUSH &x, const exreq_appt_meetreq_overlap &d)
 	return x.p_uint64(d.end_time);
 }
 
+static pack_result exmdb_pull(EXT_PULL &x, exreq_message_meeting_reply &d)
+{
+	TRY(x.g_str(&d.frm));
+	d.pmsgctnt = cu_alloc<MESSAGE_CONTENT>();
+	if (d.pmsgctnt == nullptr)
+		return EXT_ERR_ALLOC;
+	return x.g_msgctnt(d.pmsgctnt);
+}
+
+static pack_result exmdb_push(EXT_PUSH &x, const exreq_message_meeting_reply &d)
+{
+	TRY(x.p_str(d.frm));
+	return x.p_msgctnt(*d.pmsgctnt);
+}
+
 static pack_result exmdb_pull(EXT_PULL &x, exreq_recalc_store_size &d)
 {
 	return x.g_uint32(&d.flags);
@@ -2390,6 +2405,7 @@ static pack_result exmdb_push(EXT_PUSH &x, const exreq_recalc_store_size &d)
 	E(autoreply_tsquery) \
 	E(autoreply_tsupdate) \
 	E(appt_meetreq_overlap) \
+	E(message_meeting_reply) \
 	E(recalc_store_size)
 
 /**
@@ -3683,6 +3699,17 @@ static pack_result exmdb_push(EXT_PUSH &x, const exresp_appt_meetreq_overlap &d)
 	return x.p_uint32(d.out_status);
 }
 
+static pack_result exmdb_pull(EXT_PULL &x, exresp_message_meeting_reply &d)
+{
+	return x.g_uint32(reinterpret_cast<uint32_t *>(&d.pb_result));
+}
+
+static pack_result exmdb_push(EXT_PUSH &x, const exresp_message_meeting_reply &d)
+{
+	return x.p_uint32(d.pb_result);
+}
+
+
 #define RSP_WITHOUT_ARGS \
 	E(ping_store) \
 	E(remove_store_properties) \
@@ -3814,7 +3841,8 @@ static pack_result exmdb_push(EXT_PUSH &x, const exresp_appt_meetreq_overlap &d)
 	E(get_public_folder_unread_count) \
 	E(store_eid_to_user) \
 	E(autoreply_tsquery) \
-	E(appt_meetreq_overlap)
+	E(appt_meetreq_overlap) \
+	E(message_meeting_reply)
 
 /* exmdb_callid::connect, exmdb_callid::listen_notification not included */
 /*
