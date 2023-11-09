@@ -1088,14 +1088,16 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					uint64_t folder_id, message_id = 0;
 					uint32_t r32 = 0;
 					unsigned int flags = 0;
+					mlog(LV_ERR, "ruleproc: sending message .....");
 					if(!exmdb_client::deliver_message(dir, par.ev_to, par.ev_from, CP_ACP, flags, dst.get(), nullptr, &folder_id, &message_id, &r32)){
 						mlog(LV_ERR, "ruleproc: send_message failed");
 						return ecRpcFailed;
 					}
-					auto dm_status = static_cast<deliver_message_result>(r32);
-					if (dm_status == deliver_message_result::result_ok) {
-						mlog(LV_ERR, "ruleproc: delivery message result is ok");
-					}
+					mlog(LV_ERR, "ruleproc: done sending message");
+					// auto dm_status = static_cast<deliver_message_result>(r32);
+					// if (dm_status == deliver_message_result::result_ok) {
+					// 	mlog(LV_ERR, "ruleproc: delivery message result is ok");
+					// }
 					if (!exmdb_client::write_message(dir, use_name, CP_UTF8,
 						par.cur.fid, dst.get(), &e_result)) {
 						mlog(LV_ERR, "ruleproc: write_message failed");
