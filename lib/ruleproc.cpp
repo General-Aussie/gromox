@@ -1080,14 +1080,14 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					// 	mlog(LV_DEBUG, "ruleproc: cannot send message: %s\n", mapi_strerror(e_result));
 					// 	return ecRpcFailed;
 					// }
-					// auto mnt_time = rop_util_current_nttime();
-					// if (dst->proplist.set(PR_MESSAGE_DELIVERY_TIME, &mnt_time) != 0)
-					// 	/* ignore */;
-					// dst->proplist.erase(PidTagChangeNumber);
+					auto mnt_time = rop_util_current_nttime();
+					if (dst->proplist.set(PR_MESSAGE_DELIVERY_TIME, &mnt_time) != 0)
+						/* ignore */;
+					dst->proplist.erase(PidTagChangeNumber);
 					mlog(LV_ERR, "ruleproc: about to send_message");
 					uint64_t folder_id, message_id = 0;
 					uint32_t r32 = 0;
-					unsigned int flags = DELIVERY_DO_RULES | DELIVERY_DO_NOTIF;
+					unsigned int flags = 0;
 					if(!exmdb_client::deliver_message(dir, par.ev_to, par.ev_from, CP_ACP, flags, dst.get(), nullptr, &folder_id, &message_id, &r32)){
 						mlog(LV_ERR, "ruleproc: send_message failed");
 						return ecRpcFailed;
