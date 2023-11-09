@@ -2261,6 +2261,7 @@ static pack_result exmdb_push(EXT_PUSH &x, const exreq_appt_meetreq_overlap &d)
 static pack_result exmdb_pull(EXT_PULL &x, exreq_message_meeting_reply &d)
 {
 	TRY(x.g_str(&d.frm));
+	TRY(x.g_uint64(&d.mid));
 	d.pmsgctnt = cu_alloc<MESSAGE_CONTENT>();
 	if (d.pmsgctnt == nullptr)
 		return EXT_ERR_ALLOC;
@@ -2270,6 +2271,7 @@ static pack_result exmdb_pull(EXT_PULL &x, exreq_message_meeting_reply &d)
 static pack_result exmdb_push(EXT_PUSH &x, const exreq_message_meeting_reply &d)
 {
 	TRY(x.p_str(d.frm));
+	TRY(x.p_uint64(d.mid));
 	return x.p_msgctnt(*d.pmsgctnt);
 }
 

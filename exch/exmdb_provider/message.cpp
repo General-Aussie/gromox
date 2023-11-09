@@ -4010,25 +4010,45 @@ BOOL exmdb_server::appt_meetreq_overlap(const char *dir, const char *username, u
     return ecSuccess;
 }
 
-BOOL exmdb_server::message_meeting_reply(const char *dir, const char *frm, const MESSAGE_CONTENT *pmsgctnt, ec_error_t *pb_result)
+BOOL exmdb_server::message_meeting_reply(const char *dir, const char *frm, uint64_t mid, const MESSAGE_CONTENT *pmsgctnt, ec_error_t *pb_result)
 {
 	char tmp_buff[256*1024];
+	uint64_t mid_val;
+	char sql_string[256];
 	/* Buffers above may be referenced by pmsgctnt (cu_set_propvals) */	
 	*pb_result = ecSuccess;
+	sqlite3 *sqlite = nullptr;
 	mlog(LV_ERR, "W-PREC: pb_result set to true");
+	
+	auto pdb = db_engine_get_db(dir);
+	if (pdb == nullptr || pdb->psqlite == nullptr)
+		return FALSE;
+	mid_val = rop_util_get_gc_value(mid);
+	snprintf(sql_string, std::size(sql_string), "SELECT message_id FROM"
+	          " messages WHERE message_id=%llu", LLU{mid_val});
+	auto pstmt = gx_sql_prep(sqlite, sql_string);
+	if (pstmt == nullptr)
+		return FALSE;
+	if (pstmt.step() != SQLITE_ROW) {
+		*ppbrief = NULL;
+		return TRUE;
+	}
+	// pstmt.finalize();
 
 	// auto flag = pmsgctnt->proplist.get<const uint8_t>(PR_ASSOCIATED);
 	// if (flag == nullptr || *flag == 0)
 	// 	return TRUE;
 	
+	g_sqlite_for_oxcmail = sqlite;
 	MAIL imail;
 	mlog(LV_ERR, "W-PREC: setting mail");
 	if (!oxcmail_export(pmsgctnt, false, oxcmail_body::plain_and_html,
 	    &imail, common_util_alloc,
 	    message_get_propids, message_get_propname)) {
-		mlog(LV_ERR, "W-PREC: oxcimail export is false");
+		g_sqlite_for_oxcmail = nullptr;
 		return FALSE;
 	}
+	g_sqlite_for_oxcmail = nullptr;
 	mlog(LV_ERR, "W-PREC: oxcimail export is true");
 	auto pmime = imail.get_head();
 	if (pmime == nullptr)

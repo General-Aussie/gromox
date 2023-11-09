@@ -863,6 +863,7 @@ struct exreq_appt_meetreq_overlap : public exreq {
 
 struct exreq_message_meeting_reply : public exreq {
 	char *frm;
+	uint64_t mid;
 	MESSAGE_CONTENT *pmsgctnt;
 };
 

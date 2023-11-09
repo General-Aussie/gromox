@@ -811,7 +811,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 	// TARRAY_SET *prcpts;
 	TPROPVAL_ARRAY *pproplist;
 	uint8_t tmp_byte;
-	std::string subjectprefix;
+	char subjectprefix;
 	uint32_t tmp_int32;
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
@@ -1024,7 +1024,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						return ecError;
 					
 
-					subjectprefix = "Accepted";
+					subjectprefix = "Accepted: ";
 					if (dst->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 1 %s", dir);
@@ -1071,13 +1071,28 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					/* Writeout */
 					auto frm = par.ev_from;
 					ec_error_t e_result = ecRpcFailed;
-					ec_error_t pb_result = ecRpcFailed;
-					if(!exmdb_client::message_meeting_reply(dir, frm, dst.get(), &pb_result)){
+					// ec_error_t pb_result = ecRpcFailed;
+					// if(!exmdb_client::message_meeting_reply(dir, frm, dst_mid, dst.get(), &pb_result)){
+					// 	mlog(LV_DEBUG, "ruleproc: send_message failed");
+					// 	return ecRpcFailed;
+					// } else if (pb_result != ecSuccess) {
+					// 	mlog(LV_DEBUG, "ruleproc: cannot send message: %s\n", mapi_strerror(e_result));
+					// 	return ecRpcFailed;
+					// }
+					auto mnt_time = rop_util_current_nttime();
+					if (dst->proplist.set(PR_MESSAGE_DELIVERY_TIME, &mnt_time) != 0)
+						/* ignore */;
+					dst->proplist.erase(PidTagChangeNumber);
+					uint64_t folder_id, message_id = 0;
+					uint32_t r32 = 0;
+					unsigned int flags = DELIVERY_DO_RULES | DELIVERY_DO_NOTIF;
+					if(!exmdb_client::deliver_message(dir, par.ev_to, par.ev_from, CP_ACP, flags, dst.get(), nullptr, &folder_id, &message_id, &r32)){
 						mlog(LV_DEBUG, "ruleproc: send_message failed");
 						return ecRpcFailed;
-					} else if (pb_result != ecSuccess) {
-						mlog(LV_DEBUG, "ruleproc: cannot send message: %s\n", mapi_strerror(e_result));
-						return ecRpcFailed;
+					}
+					auto dm_status = static_cast<deliver_message_result>(r32);
+					if (dm_status == deliver_message_result::result_ok) {
+						mlog(LV_DEBUG, "ruleproc: delivery message result is ok");
 					}
 					if (!exmdb_client::write_message(dir, use_name, CP_UTF8,
 						par.cur.fid, dst.get(), &e_result)) {
@@ -1090,7 +1105,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					mlog(LV_ERR, "PREC: done writing out  %s", dir);
 					if (g_ruleproc_debug)
 						mlog(LV_DEBUG, "ruleproc: OP_COPY/MOVE to %s\n", dir);
-
+					message_content_free(dst);
 					uint64_t change_num = 0;
 					if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
 						return ecRpcFailed;
@@ -1127,7 +1142,6 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					if (!exmdb_client::movecopy_message(par.cur.dir.c_str(), 0, CP_ACP,
 						par.cur.mid, cal_eid, dst_mid, TRUE, &result))
 						return ecRpcFailed;
-					return ecSuccess;
 				}
 				PROBLEM_ARRAY problems{};
 				if (!exmdb_client::set_message_properties(par.cur.dir.c_str(),
