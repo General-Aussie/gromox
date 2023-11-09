@@ -811,7 +811,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 	// TARRAY_SET *prcpts;
 	TPROPVAL_ARRAY *pproplist;
 	uint8_t tmp_byte;
-	char subjectprefix;
+	// char subjectprefix;
 	uint32_t tmp_int32;
 	auto responseDeclined = olResponseDeclined;
 	auto responseAccepted = olResponseAccepted;
@@ -1024,7 +1024,8 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 						return ecError;
 					
 
-					subjectprefix = "Accepted: ";
+					// subjectprefix = "Accepted: ";
+					const char* subjectprefix = "Accepted: ";
 					if (dst->proplist.set(PROP_TAG(PT_LONG, propids.ppropid[1]), &responseAccepted) != 0)
 						return ecError;
 					mlog(LV_ERR, "PREC: about to write out 1 %s", dir);
@@ -1105,7 +1106,7 @@ static ec_error_t process_meeting_requests(rxparam par, const char* dir, bool *i
 					mlog(LV_ERR, "PREC: done writing out  %s", dir);
 					if (g_ruleproc_debug)
 						mlog(LV_DEBUG, "ruleproc: OP_COPY/MOVE to %s\n", dir);
-					message_content_free(dst);
+					message_content_free(dst.get());
 					uint64_t change_num = 0;
 					if (!exmdb_client::allocate_cn(par.cur.dir.c_str(), &change_num))
 						return ecRpcFailed;
