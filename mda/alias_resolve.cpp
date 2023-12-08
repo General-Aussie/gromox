@@ -218,6 +218,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 		// Check if the recipient is already seen
 		if (seen.emplace(originalRecipient).second) {
 			mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", originalRecipient.c_str());
+			todo[i] = {};
 
 			// Log the contents of the 'seen' set
 			mlog(LV_NOTICE, "Contents of 'seen' set:");
