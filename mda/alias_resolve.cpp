@@ -194,6 +194,11 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 	std::vector<std::string> output_rcpt;
 	std::set<std::string> seen;
 	std::vector<std::string> todo = ctrl->rcpt;
+	// Log the contents of the 'seen' set
+	mlog(LV_NOTICE, "First check for Contents of 'seen' set:");
+	for (const auto& recipient : seen) {
+		mlog(LV_NOTICE, "  %s", recipient.c_str());
+	}
 
 	for (size_t i = 0; i < todo.size(); ++i) {
 		auto at = strchr(todo[i].c_str(), '@');
@@ -208,6 +213,11 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 			if (expos != todo[i].npos && expos < atpos)
 				todo[i].erase(expos, atpos - expos);
 		}
+		// Log the contents of the 'seen' set
+		mlog(LV_NOTICE, "Second check for Contents of 'seen' set:");
+		for (const auto& recipient : seen) {
+			mlog(LV_NOTICE, "  %s", recipient.c_str());
+		}
 		auto originalRecipient = todo[i];
 		auto repl = alias_map.lookup(todo[i].c_str());
 		if (repl.size() != 0) {
@@ -217,23 +227,31 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 		}
 		// Check if the recipient is already seen
 		if (seen.emplace(originalRecipient).second) {
-			mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", originalRecipient.c_str());
-			todo[i] = {};
+			
+			mlog(LV_NOTICE, "Recipient %s not seen yet.", originalRecipient.c_str());
 
 			// Log the contents of the 'seen' set
-			mlog(LV_NOTICE, "Contents of 'seen' set:");
+			mlog(LV_NOTICE, "Third check for Contents of 'seen' set:");
 			for (const auto& recipient : seen) {
 				mlog(LV_NOTICE, "  %s", recipient.c_str());
 			}
 
 			continue;
 		} else {
-			mlog(LV_NOTICE, "Recipient %s not seen yet.", originalRecipient.c_str());
+			mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", originalRecipient.c_str());
 			// Log the contents of the 'seen' set
-			mlog(LV_NOTICE, "Contents of 'seen' set:");
+			mlog(LV_NOTICE, "Third check for Contents of 'seen' set:");
 			for (const auto& recipient : seen) {
 				mlog(LV_NOTICE, "  %s", recipient.c_str());
 			}
+			todo[i] = {};
+			continue;
+		}
+
+		// Log the contents of the 'seen' set
+		mlog(LV_NOTICE, "Fourth check for Contents of 'seen' set:");
+		for (const auto& recipient : seen) {
+			mlog(LV_NOTICE, "  %s", recipient.c_str());
 		}
 
 		if (strchr(todo[i].c_str(), '@') == nullptr) {
