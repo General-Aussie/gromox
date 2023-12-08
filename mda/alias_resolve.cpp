@@ -194,11 +194,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 	std::vector<std::string> output_rcpt;
 	std::set<std::string> seen;
 	std::vector<std::string> todo = ctrl->rcpt;
-	// Log the contents of the 'seen' set
-	mlog(LV_NOTICE, "First check for Contents of 'seen' set:");
-	for (const auto& recipient : seen) {
-		mlog(LV_NOTICE, "  %s", recipient.c_str());
-	}
+	auto bnctx = get_context();
 
 	for (size_t i = 0; i < todo.size(); ++i) {
 		auto at = strchr(todo[i].c_str(), '@');
@@ -213,44 +209,16 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 			if (expos != todo[i].npos && expos < atpos)
 				todo[i].erase(expos, atpos - expos);
 		}
-		// Log the contents of the 'seen' set
-		mlog(LV_NOTICE, "Second check for Contents of 'seen' set:");
-		for (const auto& recipient : seen) {
-			mlog(LV_NOTICE, "  %s", recipient.c_str());
-		}
-		auto originalRecipient = todo[i];
 		auto repl = alias_map.lookup(todo[i].c_str());
 		if (repl.size() != 0) {
 			mlog(LV_DEBUG, "alias_resolve: subst RCPT %s -> %s",
 				todo[i].c_str(), repl.c_str());
 			todo[i] = std::move(repl);
 		}
-		// Check if the recipient is already seen
-		auto insertResult = seen.insert(originalRecipient);
-		if (insertResult.second) {
-			mlog(LV_NOTICE, "Recipient %s not seen yet.", originalRecipient.c_str());
-
-			// Log the contents of the 'seen' set
-			mlog(LV_NOTICE, "Third check for Contents of 'seen' set:");
-			for (const auto& recipient : seen) {
-				mlog(LV_NOTICE, "  %s", recipient.c_str());
-			}
-		} else {
-			mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", originalRecipient.c_str());
-			// Log the contents of the 'seen' set
-			mlog(LV_NOTICE, "Third check for Contents of 'seen' set:");
-			for (const auto& recipient : seen) {
-				mlog(LV_NOTICE, "  %s", recipient.c_str());
-			}
+		if (!seen.emplace(todo[i]).second) {
 			todo[i] = {};
+			continue;
 		}
-
-		// Log the contents of the 'seen' set
-		mlog(LV_NOTICE, "Fourth check for Contents of 'seen' set:");
-		for (const auto& recipient : seen) {
-			mlog(LV_NOTICE, "  %s", recipient.c_str());
-		}
-
 		if (strchr(todo[i].c_str(), '@') == nullptr) {
 			output_rcpt.emplace_back(std::move(todo[i]));
 			continue;
@@ -263,6 +231,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 		switch (gmm_result) {
 		case ML_NONE:
 			output_rcpt.emplace_back(std::move(todo[i]));
+			throw_context(bnctx);
 			continue;
 		case ML_OK:
 			mlog(LV_DEBUG, "mlist_expand: subst RCPT %s -> %zu entities",
@@ -277,7 +246,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 			auto tpl = gmm_result == ML_XDOMAIN ? "BOUNCE_MLIST_DOMAIN" :
 			           gmm_result == ML_XINTERNAL ? "BOUNCE_MLIST_INTERNAL" :
 			           "BOUNCE_MLIST_SPECIFIED";
-			auto bnctx = get_context();
+			
 			if (bnctx == nullptr || !mlex_bouncer_make(ctx->ctrl.from,
 			    todo[i].c_str(), &ctx->mail, tpl, &bnctx->mail)) {
 				output_rcpt.emplace_back(std::move(todo[i]));
