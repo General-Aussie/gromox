@@ -226,8 +226,8 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 			todo[i] = std::move(repl);
 		}
 		// Check if the recipient is already seen
-		if (seen.emplace(originalRecipient).second) {
-			
+		auto insertResult = seen.insert(originalRecipient);
+		if (insertResult.second) {
 			mlog(LV_NOTICE, "Recipient %s not seen yet.", originalRecipient.c_str());
 
 			// Log the contents of the 'seen' set
