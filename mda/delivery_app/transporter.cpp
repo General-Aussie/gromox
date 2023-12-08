@@ -891,8 +891,8 @@ static BOOL transporter_throw_context(MESSAGE_CONTEXT *pcontext)
 		pnode = double_list_get_after(&pthr_data->anti_loop.thrown_list, pnode)) {
 		auto circle_node = static_cast<CIRCLE_NODE *>(pnode->pdata);
 		mlog(LV_DEBUG, "Comparing hook_addr: %p with last_hook: %p", 
-			static_cast<void*>(circle_node->hook_addr),
-			static_cast<void*>(pthr_data->last_hook));
+			reinterpret_cast<void*>(circle_node->hook_addr),
+			reinterpret_cast<void*>(pthr_data->last_hook));
 
 		if (circle_node->hook_addr == pthr_data->last_hook) {
 			mlog(LV_DEBUG, "Match found. Breaking the loop.");
