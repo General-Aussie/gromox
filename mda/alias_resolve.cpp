@@ -250,6 +250,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
                 case ML_NONE:
                     mlog(LV_NOTICE, "Recipient %s: No mailing list expansion needed.", todo[i].c_str());
                     output_rcpt.emplace_back(std::move(todo[i]));
+					throw_context(ctx);
                     break;
                 case ML_OK:
                     mlog(LV_NOTICE, "Recipient %s: Mailing list expansion needed. Expanding to %zu entities.",
