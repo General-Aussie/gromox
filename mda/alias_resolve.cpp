@@ -180,12 +180,12 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
     auto &domset = *domset_ptr;
 
     auto ctrl = &ctx->ctrl;
-    mlog(LV_DEBUG, "Starting xa_alias_subst for sender: %s", ctrl->from);
+    mlog(LV_NOTICE, "Starting xa_alias_subst for sender: %s", ctrl->from);
 
     if (strchr(ctrl->from, '@') != nullptr) {
         const auto &repl = alias_map.lookup(ctrl->from);
         if (repl.size() > 0) {
-            mlog(LV_DEBUG, "alias_resolve: subst FROM %s -> %s", ctrl->from, repl.c_str());
+            mlog(LV_NOTICE, "alias_resolve: subst FROM %s -> %s", ctrl->from, repl.c_str());
             gx_strlcpy(ctrl->from, repl.c_str(), std::size(ctrl->from));
         }
     }
@@ -200,7 +200,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 
     for (size_t i = 0; i < todo.size(); ++i) {
         auto at = strchr(todo[i].c_str(), '@');
-        mlog(LV_DEBUG, "Processing recipient: %s", todo[i].c_str());
+        mlog(LV_NOTICE, "Processing recipient: %s", todo[i].c_str());
 
         if (at != nullptr && domset.find(&at[1]) != domset.cend()) {
             size_t atpos = at - todo[i].c_str();
@@ -211,18 +211,18 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 
         auto repl = alias_map.lookup(todo[i].c_str());
         if (repl.size() != 0) {
-            mlog(LV_DEBUG, "alias_resolve: subst RCPT %s -> %s", todo[i].c_str(), repl.c_str());
+            mlog(LV_NOTICE, "alias_resolve: subst RCPT %s -> %s", todo[i].c_str(), repl.c_str());
             todo[i] = std::move(repl);
         }
 
         if (!seen.emplace(todo[i]).second) {
-            mlog(LV_DEBUG, "Recipient %s already seen. Skipping.", todo[i].c_str());
+            mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", todo[i].c_str());
             todo[i] = {};
             continue;
         }
 
         if (strchr(todo[i].c_str(), '@') == nullptr) {
-            mlog(LV_DEBUG, "Recipient %s has no domain. Adding to output_rcpt.", todo[i].c_str());
+            mlog(LV_NOTICE, "Recipient %s has no domain. Adding to output_rcpt.", todo[i].c_str());
             output_rcpt.emplace_back(std::move(todo[i]));
             continue;
         }
@@ -233,18 +233,18 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 		mlog(LV_DEBUG, "Attempting mailing list expansion for recipient: %s", todo[i].c_str());
 		if (!get_mlist_memb(todo[i].c_str(), ctx->ctrl.from, &gmm_result, exp_result)) {
 			gmm_result = ML_NONE;
-			mlog(LV_DEBUG, "Mailing list expansion failed for recipient: %s", todo[i].c_str());
+			mlog(LV_NOTICE, "Mailing list expansion failed for recipient: %s", todo[i].c_str());
 		} else {
-			mlog(LV_DEBUG, "Mailing list expansion succeeded for recipient: %s", todo[i].c_str());
+			mlog(LV_NOTICE, "Mailing list expansion succeeded for recipient: %s", todo[i].c_str());
 		}
 
         switch (gmm_result) {
             case ML_NONE:
-                mlog(LV_DEBUG, "Recipient %s: No mailing list expansion needed.", todo[i].c_str());
+                mlog(LV_NOTICE, "Recipient %s: No mailing list expansion needed.", todo[i].c_str());
                 output_rcpt.emplace_back(std::move(todo[i]));
                 break;
             case ML_OK:
-                mlog(LV_DEBUG, "Recipient %s: Mailing list expansion needed. Expanding to %zu entities.",
+                mlog(LV_NOTICE, "Recipient %s: Mailing list expansion needed. Expanding to %zu entities.",
                      todo[i].c_str(), exp_result.size());
                 todo.insert(todo.begin() + i + 1,
                             std::make_move_iterator(exp_result.begin()),
@@ -253,7 +253,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
             case ML_XDOMAIN:
             case ML_XINTERNAL:
             case ML_XSPECIFIED: {
-                mlog(LV_DEBUG, "Recipient %s: Mailing list expansion failed. Bouncing.", todo[i].c_str());
+                mlog(LV_NOTICE, "Recipient %s: Mailing list expansion failed. Bouncing.", todo[i].c_str());
                 auto tpl = gmm_result == ML_XDOMAIN ? "BOUNCE_MLIST_DOMAIN" :
                            gmm_result == ML_XINTERNAL ? "BOUNCE_MLIST_INTERNAL" :
                            "BOUNCE_MLIST_SPECIFIED";
@@ -268,7 +268,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
                            std::size(bnctx->ctrl.from));
                 bnctx->ctrl.rcpt.emplace_back(ctx->ctrl.from);
                 throw_context(bnctx);
-                mlog(LV_DEBUG, "Recipient %s: Bouncing due to mailing list expansion failure.", todo[i].c_str());
+                mlog(LV_NOTICE, "Recipient %s: Bouncing due to mailing list expansion failure.", todo[i].c_str());
                 break;
             }
         }

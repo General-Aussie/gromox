@@ -879,7 +879,7 @@ static BOOL transporter_throw_context(MESSAGE_CONTEXT *pcontext)
 		return FALSE;
 	}
 	auto pthr_data = g_tls_key;
-	mlog(LV_ERR, "Value of pthr_data: %p", static_cast<void*>(pthr_data));
+	mlog(LV_NOTICE, "Value of pthr_data: %p", static_cast<void*>(pthr_data));
 
 	if (NULL == pthr_data) {
 		transporter_put_context(pcontext);
@@ -890,7 +890,7 @@ static BOOL transporter_throw_context(MESSAGE_CONTEXT *pcontext)
 		NULL != pnode;
 		pnode = double_list_get_after(&pthr_data->anti_loop.thrown_list, pnode)) {
 		auto circle_node = static_cast<CIRCLE_NODE *>(pnode->pdata);
-		mlog(LV_DEBUG, "Comparing hook_addr: %p with last_hook: %p", 
+		mlog(LV_NOTICE, "Comparing hook_addr: %p with last_hook: %p", 
 			reinterpret_cast<void*>(circle_node->hook_addr),
 			reinterpret_cast<void*>(pthr_data->last_hook));
 
@@ -900,14 +900,14 @@ static BOOL transporter_throw_context(MESSAGE_CONTEXT *pcontext)
 		}
 	}
 	if (NULL != pnode) {
-		mlog(LV_ERR, "transporter: message infinite loop is detected");
+		mlog(LV_NOTICE, "transporter: message infinite loop is detected");
 		transporter_put_context(pcontext);
 		return FALSE;
 	}
 	/* append this hook into thrown list */
 	pcircle = reinterpret_cast<CIRCLE_NODE *>(double_list_pop_front(&pthr_data->anti_loop.free_list));
 	if (NULL == pcircle) {
-		mlog(LV_ERR, "transporter: exceed the maximum depth that one thread "
+		mlog(LV_NOTICE, "transporter: exceed the maximum depth that one thread "
 			"can throw");
 		transporter_put_context(pcontext);
         return FALSE;
