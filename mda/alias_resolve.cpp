@@ -238,20 +238,21 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
             std::vector<std::string> exp_result;
             int gmm_result = 0;
 
-            mlog(LV_DEBUG, "Attempting mailing list expansion for recipient: %s", todo[i].c_str());
+            mlog(LV_NOTICE, "Attempting mailing list expansion for recipient: %s", todo[i].c_str());
             if (!get_mlist_memb(todo[i].c_str(), ctx->ctrl.from, &gmm_result, exp_result)) {
                 gmm_result = ML_NONE;
                 mlog(LV_NOTICE, "Mailing list expansion failed for recipient: %s", todo[i].c_str());
             } else {
                 mlog(LV_NOTICE, "Mailing list expansion succeeded for recipient: %s", todo[i].c_str());
+				gmm_result = ML_OK;
             }
 
             switch (gmm_result) {
                 case ML_NONE:
                     mlog(LV_NOTICE, "Recipient %s: No mailing list expansion needed.", todo[i].c_str());
 					
-					throw_context(&ctx);
-					output_rcpt.emplace_back(std::move(todo[i]));
+					// throw_context(&ctx);
+					// output_rcpt.emplace_back(std::move(todo[i]));
                     break;
                 case ML_OK:
                     mlog(LV_NOTICE, "Recipient %s: Mailing list expansion needed. Expanding to %zu entities.",
