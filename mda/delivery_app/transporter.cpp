@@ -2,6 +2,7 @@
 #include <condition_variable>
 #include <csignal>
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -879,8 +880,9 @@ static BOOL transporter_throw_context(MESSAGE_CONTEXT *pcontext)
 		return FALSE;
 	}
 	auto pthr_data = g_tls_key;
-	mlog(LV_NOTICE, "Value of last_hook: %p", static_cast<void*>(pthr_data->last_hook));
-	mlog(LV_NOTICE, "Value of last_thrower: %p", static_cast<void*>(pthr_data->last_thrower));
+	mlog(LV_NOTICE, "Value of last_hook: %p", reinterpret_cast<void*>(static_cast<uintptr_t>(pthr_data->last_hook)));
+	mlog(LV_NOTICE, "Value of last_thrower: %p", reinterpret_cast<void*>(static_cast<uintptr_t>(pthr_data->last_thrower)));
+
 
 	if (NULL == pthr_data) {
 		transporter_put_context(pcontext);
