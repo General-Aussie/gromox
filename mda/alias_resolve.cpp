@@ -235,8 +235,6 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 			for (const auto& recipient : seen) {
 				mlog(LV_NOTICE, "  %s", recipient.c_str());
 			}
-
-			continue;
 		} else {
 			mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", originalRecipient.c_str());
 			// Log the contents of the 'seen' set
@@ -245,7 +243,6 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 				mlog(LV_NOTICE, "  %s", recipient.c_str());
 			}
 			todo[i] = {};
-			continue;
 		}
 
 		// Log the contents of the 'seen' set
