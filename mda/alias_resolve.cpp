@@ -208,15 +208,16 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 			if (expos != todo[i].npos && expos < atpos)
 				todo[i].erase(expos, atpos - expos);
 		}
+		auto originalRecipient = todo[i];
 		auto repl = alias_map.lookup(todo[i].c_str());
 		if (repl.size() != 0) {
 			mlog(LV_DEBUG, "alias_resolve: subst RCPT %s -> %s",
 				todo[i].c_str(), repl.c_str());
 			todo[i] = std::move(repl);
 		}
-		if (!seen.emplace(todo[i]).second) {
-			todo[i] = {};
-			mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", todo[i].c_str());
+		// Check if the recipient is already seen
+		if (seen.emplace(originalRecipient).second) {
+			mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", originalRecipient.c_str());
 
 			// Log the contents of the 'seen' set
 			mlog(LV_NOTICE, "Contents of 'seen' set:");
@@ -226,7 +227,7 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 
 			continue;
 		} else {
-			mlog(LV_NOTICE, "Recipient %s not seen yet.", todo[i].c_str());
+			mlog(LV_NOTICE, "Recipient %s not seen yet.", originalRecipient.c_str());
 			// Log the contents of the 'seen' set
 			mlog(LV_NOTICE, "Contents of 'seen' set:");
 			for (const auto& recipient : seen) {
