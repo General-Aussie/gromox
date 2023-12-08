@@ -227,6 +227,11 @@ static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 			continue;
 		} else {
 			mlog(LV_NOTICE, "Recipient %s not seen yet.", todo[i].c_str());
+			// Log the contents of the 'seen' set
+			mlog(LV_NOTICE, "Contents of 'seen' set:");
+			for (const auto& recipient : seen) {
+				mlog(LV_NOTICE, "  %s", recipient.c_str());
+			}
 		}
 
 		if (strchr(todo[i].c_str(), '@') == nullptr) {
