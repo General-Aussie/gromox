@@ -169,137 +169,114 @@ static void xa_refresh_thread()
 
 static hook_result xa_alias_subst(MESSAGE_CONTEXT *ctx) try
 {
-    decltype(xa_alias_map) alias_map_ptr;
-    decltype(xa_domain_set) domset_ptr;
-    {
-        std::unique_lock lk(xa_alias_lock);
-        alias_map_ptr = xa_alias_map;
-        domset_ptr = xa_domain_set;
-    }
-    auto &alias_map = *alias_map_ptr;
-    auto &domset = *domset_ptr;
+	decltype(xa_alias_map) alias_map_ptr;
+	decltype(xa_domain_set) domset_ptr;
+	{
+		std::unique_lock lk(xa_alias_lock);
+		alias_map_ptr = xa_alias_map;
+		domset_ptr = xa_domain_set;
+	}
+	auto &alias_map = *alias_map_ptr;
+	auto &domset = *domset_ptr;
 
-    auto ctrl = &ctx->ctrl;
-    mlog(LV_NOTICE, "Starting xa_alias_subst for sender: %s", ctrl->from);
-
-    if (strchr(ctrl->from, '@') != nullptr) {
-        const auto &repl = alias_map.lookup(ctrl->from);
-        if (repl.size() > 0) {
-            mlog(LV_NOTICE, "alias_resolve: subst FROM %s -> %s", ctrl->from, repl.c_str());
-            gx_strlcpy(ctrl->from, repl.c_str(), std::size(ctrl->from));
-        }
-    }
-		/*
+	auto ctrl = &ctx->ctrl;
+	if (strchr(ctrl->from, '@') != nullptr) {
+		const auto &repl = alias_map.lookup(ctrl->from);
+		if (repl.size() > 0) {
+			mlog(LV_DEBUG, "alias_resolve: subst FROM %s -> %s", ctrl->from, repl.c_str());
+			gx_strlcpy(ctrl->from, repl.c_str(), std::size(ctrl->from));
+		}
+	}
+	/*
 	 * For diagnostic purposes, don't modify/steal from ctrl->rcpt until
 	 * the replacement list is fully constructed.
 	 */
-
-    std::vector<std::string> output_rcpt;
-    std::set<std::string> seen;
-    std::vector<std::string> todo = ctrl->rcpt;
-
-    constexpr size_t MAX_RECIPIENT_PROCESSING = 3;  // Set a reasonable limit
+	std::vector<std::string> output_rcpt;
+	std::set<std::string> seen;
+	std::vector<std::string> todo = ctrl->rcpt;
 
 	for (size_t i = 0; i < todo.size(); ++i) {
-		mlog(LV_NOTICE, "Current size of todo vector: %zu", todo.size());
 		auto at = strchr(todo[i].c_str(), '@');
-		mlog(LV_NOTICE, "Processing recipient: %s", todo[i].c_str());
+		if (at != nullptr && domset.find(&at[1]) != domset.cend()) {
+			/*
+			 * Contacts may resolve to remote addresses, which we
+			 * do not want to strip anything from, so limit
+			 * extension removal to our own domains.
+			 */
+			size_t atpos = at - todo[i].c_str();
+			auto expos = todo[i].find_first_of(g_rcpt_delimiter.c_str(), 0, atpos);
+			if (expos != todo[i].npos && expos < atpos)
+				todo[i].erase(expos, atpos - expos);
+		}
+		auto repl = alias_map.lookup(todo[i].c_str());
+		if (repl.size() != 0) {
+			mlog(LV_DEBUG, "alias_resolve: subst RCPT %s -> %s",
+				todo[i].c_str(), repl.c_str());
+			todo[i] = std::move(repl);
+		}
+		if (!seen.emplace(todo[i]).second) {
+			todo[i] = {};
+			mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", todo[i].c_str());
 
-        // Counter to track recipient processing
-        size_t processingCount = 0;
+			// Log the contents of the 'seen' set
+			mlog(LV_NOTICE, "Contents of 'seen' set:");
+			for (const auto& recipient : seen) {
+				mlog(LV_NOTICE, "  %s", recipient.c_str());
+			}
 
-        // Loop to process recipient, but limit the number of iterations
-        while (processingCount < MAX_RECIPIENT_PROCESSING) {
-            if (at != nullptr && domset.find(&at[1]) != domset.cend()) {
-                size_t atpos = at - todo[i].c_str();
-                auto expos = todo[i].find_first_of(g_rcpt_delimiter.c_str(), 0, atpos);
-                if (expos != todo[i].npos && expos < atpos)
-                    todo[i].erase(expos, atpos - expos);
-            }
+			continue;
+		} else {
+			mlog(LV_NOTICE, "Recipient %s not seen yet.", todo[i].c_str());
+		}
 
-            auto repl = alias_map.lookup(todo[i].c_str());
-            if (repl.size() != 0) {
-                mlog(LV_NOTICE, "alias_resolve: subst RCPT %s -> %s", todo[i].c_str(), repl.c_str());
-                todo[i] = std::move(repl);
-            }
+		if (strchr(todo[i].c_str(), '@') == nullptr) {
+			output_rcpt.emplace_back(std::move(todo[i]));
+			continue;
+		}
 
-            if (!seen.emplace(todo[i]).second) {
-                mlog(LV_NOTICE, "Recipient %s already seen. Skipping.", todo[i].c_str());
-                todo[i] = {};
-                break;  // Break the loop to prevent further processing
-            }
-
-            if (strchr(todo[i].c_str(), '@') == nullptr) {
-                mlog(LV_NOTICE, "Recipient %s has no domain. Adding to output_rcpt.", todo[i].c_str());
-                output_rcpt.emplace_back(std::move(todo[i]));
-                break;  // Break the loop to prevent further processing
-            }
-
-            std::vector<std::string> exp_result;
-            int gmm_result = 0;
-
-            mlog(LV_NOTICE, "Attempting mailing list expansion for recipient: %s", todo[i].c_str());
-            if (!get_mlist_memb(todo[i].c_str(), ctx->ctrl.from, &gmm_result, exp_result)) {
-                gmm_result = ML_NONE;
-                mlog(LV_NOTICE, "Mailing list expansion failed for recipient: %s", todo[i].c_str());
-            } else {
-                mlog(LV_NOTICE, "Mailing list expansion succeeded for recipient: %s", todo[i].c_str());
-				gmm_result = ML_OK;
-            }
-
-            switch (gmm_result) {
-                case ML_NONE:
-                    mlog(LV_NOTICE, "Recipient %s: No mailing list expansion needed.", todo[i].c_str());
-					
-					// throw_context(&ctx);
-					// output_rcpt.emplace_back(std::move(todo[i]));
-                    break;
-                case ML_OK:
-                    mlog(LV_NOTICE, "Recipient %s: Mailing list expansion needed. Expanding to %zu entities.",
-                         todo[i].c_str(), exp_result.size());
-                    todo.insert(todo.begin() + i + 1,
-                                std::make_move_iterator(exp_result.begin()),
-                                std::make_move_iterator(exp_result.end()));
-                    break;
-                case ML_XDOMAIN:
-                case ML_XINTERNAL:
-                case ML_XSPECIFIED: {
-                    mlog(LV_NOTICE, "Recipient %s: Mailing list expansion failed. Bouncing.", todo[i].c_str());
-                    auto tpl = gmm_result == ML_XDOMAIN ? "BOUNCE_MLIST_DOMAIN" :
-                               gmm_result == ML_XINTERNAL ? "BOUNCE_MLIST_INTERNAL" :
-                               "BOUNCE_MLIST_SPECIFIED";
-                    auto bnctx = get_context();
-                    if (bnctx == nullptr || !mlex_bouncer_make(ctx->ctrl.from,
-                                                                todo[i].c_str(), &ctx->mail, tpl, &bnctx->mail)) {
-                        output_rcpt.emplace_back(std::move(todo[i]));
-                        break;
-                    }
-                    bnctx->ctrl.need_bounce = false;
-                    gx_strlcpy(bnctx->ctrl.from, bounce_gen_postmaster(),
-                               std::size(bnctx->ctrl.from));
-                    bnctx->ctrl.rcpt.emplace_back(ctx->ctrl.from);
-                    throw_context(bnctx);
-                    mlog(LV_NOTICE, "Recipient %s: Bouncing due to mailing list expansion failure.", todo[i].c_str());
-                    break;
-                }
-            }
-
-            // Increment the processing count
-            ++processingCount;
-
-            // Break the loop if no further processing is needed
-            if (gmm_result == ML_NONE || gmm_result == ML_OK) {
-                break;
-            }
-        }
-    }
-
-    ctrl->rcpt = std::move(output_rcpt);
-    return ctx->ctrl.rcpt.empty() ? hook_result::stop : hook_result::xcontinue;
-
+		std::vector<std::string> exp_result;
+		int gmm_result = 0;
+		if (!get_mlist_memb(todo[i].c_str(), ctx->ctrl.from, &gmm_result, exp_result))
+			gmm_result = ML_NONE;
+		switch (gmm_result) {
+		case ML_NONE:
+			output_rcpt.emplace_back(std::move(todo[i]));
+			continue;
+		case ML_OK:
+			mlog(LV_DEBUG, "mlist_expand: subst RCPT %s -> %zu entities",
+				todo[i].c_str(), exp_result.size());
+			todo.insert(todo.begin() + i + 1,
+				std::make_move_iterator(exp_result.begin()),
+				std::make_move_iterator(exp_result.end()));
+			continue;
+		case ML_XDOMAIN:
+		case ML_XINTERNAL:
+		case ML_XSPECIFIED: {
+			auto tpl = gmm_result == ML_XDOMAIN ? "BOUNCE_MLIST_DOMAIN" :
+			           gmm_result == ML_XINTERNAL ? "BOUNCE_MLIST_INTERNAL" :
+			           "BOUNCE_MLIST_SPECIFIED";
+			auto bnctx = get_context();
+			if (bnctx == nullptr || !mlex_bouncer_make(ctx->ctrl.from,
+			    todo[i].c_str(), &ctx->mail, tpl, &bnctx->mail)) {
+				output_rcpt.emplace_back(std::move(todo[i]));
+				break;
+			}
+			bnctx->ctrl.need_bounce = false;
+			gx_strlcpy(bnctx->ctrl.from, bounce_gen_postmaster(),
+				std::size(bnctx->ctrl.from));
+			bnctx->ctrl.rcpt.emplace_back(ctx->ctrl.from);
+			throw_context(bnctx);
+			mlog(LV_DEBUG, "mlist_expand: from=<%s> has no privilege to expand mlist <%s> (%s)",
+				ctx->ctrl.from, todo[i].c_str(), tpl);
+			break;
+		}
+		}
+	}
+	ctrl->rcpt = std::move(output_rcpt);
+	return ctx->ctrl.rcpt.empty() ? hook_result::stop : hook_result::xcontinue;
 } catch (const std::bad_alloc &) {
-    mlog(LV_INFO, "E-1611: ENOMEM");
-    return hook_result::proc_error;
+	mlog(LV_INFO, "E-1611: ENOMEM");
+	return hook_result::proc_error;
 }
 
 static constexpr const cfg_directive mysql_directives[] = {
@@ -334,8 +311,10 @@ static bool xa_reload_config(std::shared_ptr<CONFIG_FILE> &&mcfg,
 	g_parm.pass = mcfg->get_value("mysql_password");
 	g_parm.dbname = mcfg->get_value("mysql_dbname");
 	g_parm.timeout = mcfg->get_ll("mysql_rdwr_timeout");
+	bool local = g_parm.host.size() == 0 || g_parm.host == "localhost";
 	mlog(LV_NOTICE, "alias_resolve: mysql [%s]:%d, timeout=%d, db=%s",
-	       g_parm.host.size() == 0 ? "*" : g_parm.host.c_str(), g_parm.port,
+	       local ? "<Local IPC>" : g_parm.host.c_str(),
+	       local ? 0 : g_parm.port,
 	       g_parm.timeout, g_parm.dbname.c_str());
 
 	if (acfg == nullptr)
